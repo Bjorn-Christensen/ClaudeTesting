@@ -51,6 +51,9 @@ public final class Constants {
 
   // Vision setup
   public static class VisionConstants {
+    // Set to false when cameras are not physically connected (e.g. shooter testing)
+    public static final boolean CAMERAS_ENABLED = true;
+
     // One entry per camera you have configured in PhotonVision
     public static final List<CameraConfig> CAMERAS = List.of(
       new CameraConfig(
@@ -85,6 +88,27 @@ public final class Constants {
       this.name = name;
       this.robotToCam = robotToCam;
     }
+  }
+
+  // Shooter Constants
+  public static class ShooterConstants {
+    // CAN IDs — update to match your robot's CAN bus
+    public static final int FEED_MOTOR_ID        = 10;
+    public static final int FLYWHEEL_MOTOR_ID    = 11;
+    public static final int BACK_ROLLER_MOTOR_ID = 12;
+
+    // Velocity PID — Neo Vortex starting values (tune on carpet)
+    // kV = 12V / 6784 RPM (Neo Vortex free speed) — units: Volts per RPM
+    public static final double FEED_KP  = 0.0002, FEED_KI  = 0.0, FEED_KD  = 0.0, FEED_KV  = 0.001769;
+    public static final double FLYWHEEL_KP  = 0.0002, FLYWHEEL_KI  = 0.0, FLYWHEEL_KD  = 0.0, FLYWHEEL_KV  = 0.001769;
+    public static final double BACK_ROLLER_KP = 0.0002, BACK_ROLLER_KI = 0.0, BACK_ROLLER_KD = 0.0, BACK_ROLLER_KV = 0.001769;
+
+    // Flywheel considered at speed within this many RPM of target
+    public static final double FLYWHEEL_RPM_TOLERANCE = 50.0;
+
+    // Default RPMs
+    public static final double DEFAULT_FLYWHEEL_RPM = 4000.0;
+    public static final double DEFAULT_FEED_RPM     = 1500.0;
   }
 
 }

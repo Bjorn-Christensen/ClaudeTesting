@@ -15,6 +15,8 @@ import edu.wpi.first.wpilibj2.command.Subsystem;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import frc.robot.Constants.DrivetrainConstants;
 import frc.robot.Constants.ControllerConstants;
+import frc.robot.Constants.ShooterConstants;
+import frc.robot.subsystems.ShooterSubsystem;
 import frc.robot.subsystems.SwerveSubsystem;
 
 import swervelib.SwerveInputStream;
@@ -23,6 +25,7 @@ public class RobotContainer {
 
   // Subsystems
   private final SwerveSubsystem swerveSubsystem = new SwerveSubsystem(DrivetrainConstants.swerveJsonDirectory);
+  private final ShooterSubsystem shooterSubsystem = new ShooterSubsystem();
 
   // Joysticks
   final CommandXboxController controllerXbox = new CommandXboxController(0);
@@ -56,6 +59,26 @@ public class RobotContainer {
   }
 
   private void configureButtonBindings() {
+
+    // Hold left bumper to test-shoot — feeds as soon as flywheel is at speed,
+    // no facing-goal check. Use when cameras are off or during bench testing.
+    controllerXbox.leftBumper().whileTrue(
+        shooterSubsystem.shootOnReadyCommand(
+            ShooterConstants.DEFAULT_FLYWHEEL_RPM,
+            ShooterConstants.DEFAULT_FEED_RPM,
+            () -> true
+        )
+    );
+
+    // Hold right bumper to shoot — spins up flywheel immediately, feeds once at
+    // speed and robot is facing the goal. Releases everything on button release.
+    controllerXbox.rightBumper().whileTrue(
+        shooterSubsystem.shootOnReadyCommand(
+            ShooterConstants.DEFAULT_FLYWHEEL_RPM,
+            ShooterConstants.DEFAULT_FEED_RPM,
+            swerveSubsystem::isFacingGoal
+        )
+    );
 
     // Auto Drive Controls
     controllerXbox.povUp().onTrue(Commands.defer(() -> swerveSubsystem.lineUpForShooter(), swerveReq));

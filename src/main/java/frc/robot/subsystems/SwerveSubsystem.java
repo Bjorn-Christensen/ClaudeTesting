@@ -35,6 +35,7 @@ import swervelib.telemetry.SwerveDriveTelemetry.TelemetryVerbosity;
 
 import frc.robot.Constants.FieldConstants;
 import frc.robot.Constants.DrivetrainConstants;
+import frc.robot.Constants.VisionConstants;
 
 public class SwerveSubsystem extends SubsystemBase{
 
@@ -45,6 +46,7 @@ public class SwerveSubsystem extends SubsystemBase{
     private final HolonomicDriveController precisionHDC;
     private static final double POS_TOL_M = 0.05;   // tolerance in meters
     private static final double ANG_TOL_RAD = Math.toRadians(2.0); // tolerance in degrees
+    private static final double FACING_GOAL_TOLERANCE_DEG = 5.0;
 
     public SwerveSubsystem(File directory) {
 
@@ -61,8 +63,10 @@ public class SwerveSubsystem extends SubsystemBase{
         swerveDrive.setHeadingCorrection(true); // Holds heading during pure translation; update desired heading while rotating.
 
         // Enable vision tracking and path planner
-        setupPhotonVision();
-        swerveDrive.stopOdometryThread(); // Stop the odometry thread if we are using vision that way we can synchronize updates better.
+        if (VisionConstants.CAMERAS_ENABLED) {
+            setupPhotonVision();
+            swerveDrive.stopOdometryThread(); // Stop the odometry thread if we are using vision that way we can synchronize updates better.
+        }
         setupPathPlanner();
 
         // Initialize precision movement controller
@@ -93,8 +97,8 @@ public class SwerveSubsystem extends SubsystemBase{
 
     @Override
     public void periodic() {
-        swerveDrive.updateOdometry(); // When vision is enabled we must manually update odometry in SwerveDrive
-        vision.updatePoseEstimation(swerveDrive);
+        swerveDrive.updateOdometry();
+        if (VisionConstants.CAMERAS_ENABLED) vision.updatePoseEstimation(swerveDrive);
 
         // Authoritative robot pose for AdvantageScope
         Logger.recordOutput("Robot/Pose", swerveDrive.getPose());
@@ -103,7 +107,8 @@ public class SwerveSubsystem extends SubsystemBase{
     @Override
     public void simulationPeriodic() {
         // Update simulated camera poses outside the main loop to avoid overruns
-        swerveDrive.getSimulationDriveTrainPose().ifPresent(vision::updateSim);
+        if (VisionConstants.CAMERAS_ENABLED)
+            swerveDrive.getSimulationDriveTrainPose().ifPresent(vision::updateSim);
     }
 
     public Pose2d getPose() {
@@ -182,11 +187,24 @@ public class SwerveSubsystem extends SubsystemBase{
         resetOdometry(start); 
       
         // Tell vision to align
-        if (SwerveDriveTelemetry.isSimulation) {
+        if (VisionConstants.CAMERAS_ENABLED && SwerveDriveTelemetry.isSimulation) {
           vision.pauseVisionFor(0.35);    // ~ camera latency + buffer
         }
     }
     
+    // Returns true when the robot's heading is within FACING_GOAL_TOLERANCE_DEG of the hub
+    public boolean isFacingGoal() {
+        var alliance = DriverStation.getAlliance();
+        if (alliance.isEmpty()) return false;
+
+        Pose2d hubPose = (alliance.get() == DriverStation.Alliance.Blue)
+            ? FieldConstants.HUB_POSE_BLUE : FieldConstants.HUB_POSE_RED;
+
+        Translation2d toHub = hubPose.getTranslation().minus(getPose().getTranslation());
+        Rotation2d required = toHub.getAngle();
+        return Math.abs(getPose().getRotation().minus(required).getDegrees()) < FACING_GOAL_TOLERANCE_DEG;
+    }
+
     // Move to ideal hub distance and rotate to face goal, begin flywheel rotation
     public Command lineUpForShooter() {
 
