@@ -60,21 +60,20 @@ public class RobotContainer {
 
   private void configureButtonBindings() {
 
-    // Hold left bumper to test-shoot — feeds as soon as flywheel is at speed,
-    // no facing-goal check. Use when cameras are off or during bench testing.
+    // Hold left bumper to test-shoot — range-adjusted RPM, no facing-goal check.
+    // Use when cameras are off or during bench/distance testing.
     controllerXbox.leftBumper().whileTrue(
         shooterSubsystem.shootOnReadyCommand(
-            ShooterConstants.DEFAULT_FLYWHEEL_RPM,
+            () -> ShooterConstants.RANGE_TABLE.get(swerveSubsystem.getDistanceToHub()),
             ShooterConstants.DEFAULT_FEED_RPM,
             () -> true
         )
     );
 
-    // Hold right bumper to shoot — spins up flywheel immediately, feeds once at
-    // speed and robot is facing the goal. Releases everything on button release.
+    // Hold right bumper to shoot — range-adjusted RPM, requires facing the goal.
     controllerXbox.rightBumper().whileTrue(
         shooterSubsystem.shootOnReadyCommand(
-            ShooterConstants.DEFAULT_FLYWHEEL_RPM,
+            () -> ShooterConstants.RANGE_TABLE.get(swerveSubsystem.getDistanceToHub()),
             ShooterConstants.DEFAULT_FEED_RPM,
             swerveSubsystem::isFacingGoal
         )

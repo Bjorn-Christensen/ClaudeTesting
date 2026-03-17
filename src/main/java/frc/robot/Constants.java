@@ -3,6 +3,7 @@ package frc.robot;
 import java.io.File;
 import java.util.List;
 
+import edu.wpi.first.math.interpolation.InterpolatingDoubleTreeMap;
 import edu.wpi.first.wpilibj.Filesystem;
 import edu.wpi.first.apriltag.AprilTagFieldLayout;
 import edu.wpi.first.apriltag.AprilTagFields;
@@ -93,22 +94,43 @@ public final class Constants {
   // Shooter Constants
   public static class ShooterConstants {
     // CAN IDs — update to match your robot's CAN bus
-    public static final int FEED_MOTOR_ID        = 10;
-    public static final int FLYWHEEL_MOTOR_ID    = 11;
-    public static final int BACK_ROLLER_MOTOR_ID = 12;
+    public static final int FEED_MOTOR_ID        = 16;
+    public static final int FLYWHEEL_MOTOR_ID    = 17;
+    public static final int BACK_ROLLER_MOTOR_ID = 18;
 
     // Velocity PID — Neo Vortex starting values (tune on carpet)
-    // kV = 12V / 6784 RPM (Neo Vortex free speed) — units: Volts per RPM
-    public static final double FEED_KP  = 0.0002, FEED_KI  = 0.0, FEED_KD  = 0.0, FEED_KV  = 0.001769;
-    public static final double FLYWHEEL_KP  = 0.0002, FLYWHEEL_KI  = 0.0, FLYWHEEL_KD  = 0.0, FLYWHEEL_KV  = 0.001769;
-    public static final double BACK_ROLLER_KP = 0.0002, BACK_ROLLER_KI = 0.0, BACK_ROLLER_KD = 0.0, BACK_ROLLER_KV = 0.001769;
+    // kV = 1 / 6784 RPM (Neo Vortex free speed) — applied as duty-cycle per RPM
+    public static final double FEED_KP  = 0.0002, FEED_KI  = 0.0, FEED_KD  = 0.0, FEED_KV  = 0.000152;
+    public static final double FLYWHEEL_KP  = 0.0002, FLYWHEEL_KI  = 0.0, FLYWHEEL_KD  = 0.0, FLYWHEEL_KV  = 0.000152;
+    public static final double BACK_ROLLER_KP = 0.0002, BACK_ROLLER_KI = 0.0, BACK_ROLLER_KD = 0.0, BACK_ROLLER_KV = 0.000152;
+
+    // Back roller speed as a fraction of flywheel RPM.
+    // 1.0 = matched speeds (no net spin, flattest trajectory)
+    // < 1.0 = flywheel wins → backspin → Magnus effect curves ball upward (steeper arc)
+    // > 1.0 = back roller wins → topspin → flatter arc
+    // Tune in 0.05 steps. Start at 0.85 to compensate for rolling entry.
+    public static final double BACK_ROLLER_SPEED_RATIO = 0.85;
 
     // Flywheel considered at speed within this many RPM of target
     public static final double FLYWHEEL_RPM_TOLERANCE = 50.0;
 
-    // Default RPMs
+    // Default RPMs (used as fallback; range table takes over during normal operation)
     public static final double DEFAULT_FLYWHEEL_RPM = 4000.0;
     public static final double DEFAULT_FEED_RPM     = 1500.0;
+
+    // Distance (meters from hub center) → Flywheel RPM
+    // Add a measured data point for every ~0.5m of shooting range.
+    // The robot interpolates linearly between points — no point needs to be perfect,
+    // just close enough that interpolation fills the gaps accurately.
+    public static final InterpolatingDoubleTreeMap RANGE_TABLE = new InterpolatingDoubleTreeMap();
+    static {
+      RANGE_TABLE.put(1.5, 2200.0);
+      RANGE_TABLE.put(2.0, 2800.0);  // near HUB_STANDOFF_DISTANCE — tune this first
+      RANGE_TABLE.put(2.5, 3300.0);
+      RANGE_TABLE.put(3.0, 3900.0);
+      RANGE_TABLE.put(3.5, 4400.0);
+      RANGE_TABLE.put(4.0, 5000.0);
+    }
   }
 
 }

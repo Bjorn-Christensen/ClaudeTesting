@@ -102,6 +102,7 @@ public class SwerveSubsystem extends SubsystemBase{
 
         // Authoritative robot pose for AdvantageScope
         Logger.recordOutput("Robot/Pose", swerveDrive.getPose());
+        Logger.recordOutput("Robot/DistanceToHub", getDistanceToHub());
     }
 
     @Override
@@ -192,6 +193,14 @@ public class SwerveSubsystem extends SubsystemBase{
         }
     }
     
+    // Returns the straight-line distance in meters from the robot to the hub center
+    public double getDistanceToHub() {
+        var alliance = DriverStation.getAlliance();
+        Pose2d hubPose = (alliance.isPresent() && alliance.get() == DriverStation.Alliance.Blue)
+            ? FieldConstants.HUB_POSE_BLUE : FieldConstants.HUB_POSE_RED;
+        return getPose().getTranslation().getDistance(hubPose.getTranslation());
+    }
+
     // Returns true when the robot's heading is within FACING_GOAL_TOLERANCE_DEG of the hub
     public boolean isFacingGoal() {
         var alliance = DriverStation.getAlliance();

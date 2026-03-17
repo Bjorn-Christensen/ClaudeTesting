@@ -11,6 +11,7 @@ import com.revrobotics.spark.config.SparkBaseConfig.IdleMode;
 import com.revrobotics.spark.config.SparkFlexConfig;
 
 import java.util.function.BooleanSupplier;
+import java.util.function.DoubleSupplier;
 
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
@@ -88,7 +89,7 @@ public class ShooterSubsystem extends SubsystemBase {
     public void setFlywheelRpm(double rpm) {
         targetFlywheelRpm = rpm;
         flywheelController.setSetpoint(rpm, ControlType.kVelocity);
-        backRollerController.setSetpoint(rpm, ControlType.kVelocity);
+        backRollerController.setSetpoint(rpm * ShooterConstants.BACK_ROLLER_SPEED_RATIO, ControlType.kVelocity);
     }
 
     /** Drive the feed motor at the given RPM. */
@@ -151,20 +152,29 @@ public class ShooterSubsystem extends SubsystemBase {
     }
 
     /**
-     * Hold to shoot: spins up flywheel and back roller immediately, then begins
-     * feeding once the flywheel is at speed AND {@code robotReady} returns true.
+     * Hold to shoot with a dynamic RPM supplier (e.g. range table lookup).
+     * Spins up immediately; feeds only when flywheel is at speed AND robotReady is true.
+     * Feed is actively held off during any RPM dip so every ball sees the same launch speed.
      * Everything stops when the button is released.
      */
-    public Command shootOnReadyCommand(double flywheelRpm, double feedRpm, BooleanSupplier robotReady) {
+    public Command shootOnReadyCommand(DoubleSupplier flywheelRpm, double feedRpm, BooleanSupplier robotReady) {
         return runEnd(
             () -> {
-                setFlywheelRpm(flywheelRpm);
+                setFlywheelRpm(flywheelRpm.getAsDouble());
                 if (flywheelAtSpeed() && robotReady.getAsBoolean()) {
                     setFeedRpm(feedRpm);
+                } else {
+                    feedMotor.stopMotor();
+                    targetFeedRpm = 0.0;
                 }
             },
             this::stopAll
         );
+    }
+
+    /** Fixed-RPM overload — delegates to the DoubleSupplier version. */
+    public Command shootOnReadyCommand(double flywheelRpm, double feedRpm, BooleanSupplier robotReady) {
+        return shootOnReadyCommand(() -> flywheelRpm, feedRpm, robotReady);
     }
 
     /** Stop all shooter motors (one-shot). */
