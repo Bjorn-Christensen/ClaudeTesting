@@ -42,12 +42,14 @@ public class ShooterSubsystem extends SubsystemBase {
         SparkFlexConfig feedConfig = new SparkFlexConfig();
         feedConfig.inverted(false);
         feedConfig.idleMode(IdleMode.kCoast);
+        feedConfig.smartCurrentLimit(ShooterConstants.FEED_CURRENT_LIMIT);
         feedConfig.closedLoop
             .feedbackSensor(FeedbackSensor.kPrimaryEncoder)
             .p(ShooterConstants.FEED_KP)
             .i(ShooterConstants.FEED_KI)
             .d(ShooterConstants.FEED_KD);
         feedConfig.closedLoop.feedForward.kV(ShooterConstants.FEED_KV);
+        feedConfig.closedLoopRampRate(ShooterConstants.FEED_RAMP_RATE);
         feedMotor.configure(feedConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
 
         // Flywheel motor — inverted relative to feed so it spins in the opposite
@@ -55,12 +57,14 @@ public class ShooterSubsystem extends SubsystemBase {
         SparkFlexConfig flywheelConfig = new SparkFlexConfig();
         flywheelConfig.inverted(true);
         flywheelConfig.idleMode(IdleMode.kCoast);
+        flywheelConfig.smartCurrentLimit(ShooterConstants.FLYWHEEL_CURRENT_LIMIT);
         flywheelConfig.closedLoop
             .feedbackSensor(FeedbackSensor.kPrimaryEncoder)
             .p(ShooterConstants.FLYWHEEL_KP)
             .i(ShooterConstants.FLYWHEEL_KI)
             .d(ShooterConstants.FLYWHEEL_KD);
         flywheelConfig.closedLoop.feedForward.kV(ShooterConstants.FLYWHEEL_KV);
+        flywheelConfig.closedLoopRampRate(ShooterConstants.FLYWHEEL_RAMP_RATE);
         flywheelMotor.configure(flywheelConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
 
         // Back roller motor — inverted relative to the flywheel (same physical
@@ -70,12 +74,14 @@ public class ShooterSubsystem extends SubsystemBase {
         SparkFlexConfig backRollerConfig = new SparkFlexConfig();
         backRollerConfig.inverted(false);
         backRollerConfig.idleMode(IdleMode.kCoast);
+        backRollerConfig.smartCurrentLimit(ShooterConstants.BACK_ROLLER_CURRENT_LIMIT);
         backRollerConfig.closedLoop
             .feedbackSensor(FeedbackSensor.kPrimaryEncoder)
             .p(ShooterConstants.BACK_ROLLER_KP)
             .i(ShooterConstants.BACK_ROLLER_KI)
             .d(ShooterConstants.BACK_ROLLER_KD);
         backRollerConfig.closedLoop.feedForward.kV(ShooterConstants.BACK_ROLLER_KV);
+        backRollerConfig.closedLoopRampRate(ShooterConstants.BACK_ROLLER_RAMP_RATE);
         backRollerMotor.configure(backRollerConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
 
         feedController       = feedMotor.getClosedLoopController();
@@ -188,9 +194,14 @@ public class ShooterSubsystem extends SubsystemBase {
     public void periodic() {
         Logger.recordOutput("Shooter/Flywheel/TargetRPM",   targetFlywheelRpm);
         Logger.recordOutput("Shooter/Flywheel/ActualRPM",   flywheelMotor.getEncoder().getVelocity());
+        Logger.recordOutput("Shooter/Flywheel/CurrentAmps", flywheelMotor.getOutputCurrent());
+        Logger.recordOutput("Shooter/Flywheel/Faults",      flywheelMotor.getFaults().rawBits);
         Logger.recordOutput("Shooter/Feed/TargetRPM",       targetFeedRpm);
         Logger.recordOutput("Shooter/Feed/ActualRPM",       feedMotor.getEncoder().getVelocity());
+        Logger.recordOutput("Shooter/Feed/CurrentAmps",     feedMotor.getOutputCurrent());
+        Logger.recordOutput("Shooter/Feed/Faults",          feedMotor.getFaults().rawBits);
         Logger.recordOutput("Shooter/BackRoller/ActualRPM", backRollerMotor.getEncoder().getVelocity());
+        Logger.recordOutput("Shooter/BackRoller/Faults",    backRollerMotor.getFaults().rawBits);
         Logger.recordOutput("Shooter/FlywheelAtSpeed",      flywheelAtSpeed());
     }
 }

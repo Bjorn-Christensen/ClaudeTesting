@@ -16,6 +16,7 @@ import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import frc.robot.Constants.DrivetrainConstants;
 import frc.robot.Constants.ControllerConstants;
 import frc.robot.Constants.ShooterConstants;
+import frc.robot.subsystems.IntakeSubsystem;
 import frc.robot.subsystems.ShooterSubsystem;
 import frc.robot.subsystems.SwerveSubsystem;
 
@@ -26,9 +27,11 @@ public class RobotContainer {
   // Subsystems
   private final SwerveSubsystem swerveSubsystem = new SwerveSubsystem(DrivetrainConstants.swerveJsonDirectory);
   private final ShooterSubsystem shooterSubsystem = new ShooterSubsystem();
+  private final IntakeSubsystem intakeSubsystem = new IntakeSubsystem();
 
   // Joysticks
-  final CommandXboxController controllerXbox = new CommandXboxController(0);
+  final CommandXboxController controllerXbox    = new CommandXboxController(0); // driver
+  final CommandXboxController operatorXbox      = new CommandXboxController(1); // operator
 
   // Auton Chooser
   private final LoggedDashboardChooser<Command> autoChooser;
@@ -51,8 +54,10 @@ public class RobotContainer {
     configureButtonBindings();
 
     // Register named commands for PathPlanner
-    NamedCommands.registerCommand("lineUpShot", 
+    NamedCommands.registerCommand("lineUpShot",
         Commands.defer(() -> swerveSubsystem.lineUpForShooter(), Set.of(swerveSubsystem)));
+    NamedCommands.registerCommand("runIntake",  intakeSubsystem.intakeCommand());
+    NamedCommands.registerCommand("stopIntake", intakeSubsystem.stopCommand());
 
     // Build chooser after NamedCommands are registered so that event markers have something to call
     autoChooser = new LoggedDashboardChooser<>("Auto Routine", AutoBuilder.buildAutoChooser("Test"));
@@ -60,9 +65,19 @@ public class RobotContainer {
 
   private void configureButtonBindings() {
 
+    // ---- Driver controller (port 0) — driving only ----
+
+    // Auto line-up to shooting position
+    controllerXbox.povUp().onTrue(Commands.defer(() -> swerveSubsystem.lineUpForShooter(), swerveReq));
+
+    // Reset odometry to (0,0) — useful during testing/practice, never press mid-match
+    controllerXbox.povLeft().onTrue(Commands.runOnce(() -> swerveSubsystem.resetOdometry(new Pose2d()), swerveSubsystem));
+
+    // ---- Operator controller (port 1) — shooter & intake ----
+
     // Hold left bumper to test-shoot — range-adjusted RPM, no facing-goal check.
     // Use when cameras are off or during bench/distance testing.
-    controllerXbox.leftBumper().whileTrue(
+    operatorXbox.leftBumper().whileTrue(
         shooterSubsystem.shootOnReadyCommand(
             () -> ShooterConstants.RANGE_TABLE.get(swerveSubsystem.getDistanceToHub()),
             ShooterConstants.DEFAULT_FEED_RPM,
@@ -71,7 +86,7 @@ public class RobotContainer {
     );
 
     // Hold right bumper to shoot — range-adjusted RPM, requires facing the goal.
-    controllerXbox.rightBumper().whileTrue(
+    operatorXbox.rightBumper().whileTrue(
         shooterSubsystem.shootOnReadyCommand(
             () -> ShooterConstants.RANGE_TABLE.get(swerveSubsystem.getDistanceToHub()),
             ShooterConstants.DEFAULT_FEED_RPM,
@@ -79,11 +94,12 @@ public class RobotContainer {
         )
     );
 
-    // Auto Drive Controls
-    controllerXbox.povUp().onTrue(Commands.defer(() -> swerveSubsystem.lineUpForShooter(), swerveReq));
+    // Hold left trigger to run intake rollers inward
+    operatorXbox.leftTrigger(ControllerConstants.LEFT_TRIGGER_DEADZONE)
+        .whileTrue(intakeSubsystem.intakeCommand());
 
-    // Reset odometry to (0,0) — useful during testing/practice, never press mid-match
-    controllerXbox.povLeft().onTrue(Commands.runOnce(() -> swerveSubsystem.resetOdometry(new Pose2d()), swerveSubsystem));
+    // Hold X to eject / reverse intake rollers
+    operatorXbox.x().whileTrue(intakeSubsystem.ejectCommand());
 
   }
 

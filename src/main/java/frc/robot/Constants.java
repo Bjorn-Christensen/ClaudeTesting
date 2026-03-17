@@ -55,18 +55,25 @@ public final class Constants {
     // Set to false when cameras are not physically connected (e.g. shooter testing)
     public static final boolean CAMERAS_ENABLED = true;
 
-    // One entry per camera you have configured in PhotonVision
+    // One entry per camera you have configured in PhotonVision.
+    // Height: 25 inches above robot center. Pitch: slightly upward to see field AprilTags.
+    // Adjust CAMERA_PITCH_DEG if tags appear at the edge of frame — increase to look higher.
+    public static final double CAMERA_HEIGHT_INCHES = 25.0;
+    public static final double CAMERA_PITCH_DEG     = 15.0; // positive = nose up
+
     public static final List<CameraConfig> CAMERAS = List.of(
       new CameraConfig(
         "frontCam",
-        new Transform3d(new Translation3d(0.25, 0.0, Units.inchesToMeters(6.0)),
-        new Rotation3d(0.0, Math.toRadians(0.0), 0.0))
+        new Transform3d(
+          new Translation3d(0.25, 0.0, Units.inchesToMeters(CAMERA_HEIGHT_INCHES)),
+          new Rotation3d(0.0, Math.toRadians(CAMERA_PITCH_DEG), 0.0))
       ),
 
       new CameraConfig(
         "backCam",
-        new Transform3d(new Translation3d(-0.25, 0.0, Units.inchesToMeters(6.0)),
-        new Rotation3d(0.0, Math.toRadians(0.0),  Math.toRadians(180)))
+        new Transform3d(
+          new Translation3d(-0.25, 0.0, Units.inchesToMeters(CAMERA_HEIGHT_INCHES)),
+          new Rotation3d(0.0, Math.toRadians(CAMERA_PITCH_DEG), Math.toRadians(180.0)))
       )
     );
     
@@ -91,6 +98,19 @@ public final class Constants {
     }
   }
 
+  // Intake Constants
+  public static class IntakeConstants {
+    // CAN ID — update to match your robot's CAN bus
+    public static final int ROLLER_MOTOR_ID = 20; // SparkFlex, NEO Vortex
+
+    // Current limit (amps) — 35A protects against hard game piece jams; still ample intake torque
+    public static final int ROLLER_CURRENT_LIMIT = 35;
+
+    // Roller duty-cycle output
+    public static final double INTAKE_SPEED  =  0.80; // intake game piece
+    public static final double OUTTAKE_SPEED = -0.60; // eject game piece
+  }
+
   // Shooter Constants
   public static class ShooterConstants {
     // CAN IDs — update to match your robot's CAN bus
@@ -98,11 +118,25 @@ public final class Constants {
     public static final int FLYWHEEL_MOTOR_ID    = 17;
     public static final int BACK_ROLLER_MOTOR_ID = 18;
 
-    // Velocity PID — Neo Vortex starting values (tune on carpet)
+    // Current limits (amps) — sized to match 40A PDP/PDH breakers and protect motors.
+    // Flywheel: 50A allows fast spin-up while staying below breaker trip threshold.
+    //           Reduce to 40A if breakers trip during match play.
+    public static final int FLYWHEEL_CURRENT_LIMIT    = 50;
+    public static final int FEED_CURRENT_LIMIT         = 30;
+    public static final int BACK_ROLLER_CURRENT_LIMIT  = 40;
+
+    // Closed-loop ramp rates (seconds to reach full output) — prevents voltage sag on spin-up
+    public static final double FLYWHEEL_RAMP_RATE    = 0.25;
+    public static final double FEED_RAMP_RATE         = 0.10;
+    public static final double BACK_ROLLER_RAMP_RATE  = 0.25;
+
+    // Flywheel & back roller PID — Neo Vortex starting values (tune on carpet)
     // kV = 1 / 6784 RPM (Neo Vortex free speed) — applied as duty-cycle per RPM
-    public static final double FEED_KP  = 0.0002, FEED_KI  = 0.0, FEED_KD  = 0.0, FEED_KV  = 0.000152;
     public static final double FLYWHEEL_KP  = 0.0002, FLYWHEEL_KI  = 0.0, FLYWHEEL_KD  = 0.0, FLYWHEEL_KV  = 0.000152;
     public static final double BACK_ROLLER_KP = 0.0002, BACK_ROLLER_KI = 0.0, BACK_ROLLER_KD = 0.0, BACK_ROLLER_KV = 0.000152;
+
+    // Feed motor PID — tune separately; feed roller has a different load than the flywheel
+    public static final double FEED_KP  = 0.0002, FEED_KI  = 0.0, FEED_KD  = 0.0, FEED_KV  = 0.000152;
 
     // Back roller speed as a fraction of flywheel RPM.
     // 1.0 = matched speeds (no net spin, flattest trajectory)
@@ -118,18 +152,29 @@ public final class Constants {
     public static final double DEFAULT_FLYWHEEL_RPM = 4000.0;
     public static final double DEFAULT_FEED_RPM     = 1500.0;
 
-    // Distance (meters from hub center) → Flywheel RPM
-    // Add a measured data point for every ~0.5m of shooting range.
-    // The robot interpolates linearly between points — no point needs to be perfect,
-    // just close enough that interpolation fills the gaps accurately.
+    // Distance (feet from hub center) → Flywheel RPM
+    // Keys are written in feet for easy measurement with a tape measure.
+    // Units.feetToMeters() converts them to meters for the robot's internal distance calculations.
+    // All RPM values are PLACEHOLDERS — measure actual shots on carpet and replace each entry.
+    // Tune the 7 ft entry first (nearest to HUB_STANDOFF_DISTANCE), then work outward.
     public static final InterpolatingDoubleTreeMap RANGE_TABLE = new InterpolatingDoubleTreeMap();
     static {
-      RANGE_TABLE.put(1.5, 2200.0);
-      RANGE_TABLE.put(2.0, 2800.0);  // near HUB_STANDOFF_DISTANCE — tune this first
-      RANGE_TABLE.put(2.5, 3300.0);
-      RANGE_TABLE.put(3.0, 3900.0);
-      RANGE_TABLE.put(3.5, 4400.0);
-      RANGE_TABLE.put(4.0, 5000.0);
+      RANGE_TABLE.put(Units.feetToMeters(5.0),  2200.0);
+      RANGE_TABLE.put(Units.feetToMeters(5.5),  2350.0);
+      RANGE_TABLE.put(Units.feetToMeters(6.0),  2500.0);
+      RANGE_TABLE.put(Units.feetToMeters(6.5),  2700.0);
+      RANGE_TABLE.put(Units.feetToMeters(7.0),  2900.0);  // near HUB_STANDOFF_DISTANCE — tune this first
+      RANGE_TABLE.put(Units.feetToMeters(7.5),  3100.0);
+      RANGE_TABLE.put(Units.feetToMeters(8.0),  3300.0);
+      RANGE_TABLE.put(Units.feetToMeters(8.5),  3550.0);
+      RANGE_TABLE.put(Units.feetToMeters(9.0),  3750.0);
+      RANGE_TABLE.put(Units.feetToMeters(9.5),  3900.0);
+      RANGE_TABLE.put(Units.feetToMeters(10.0), 4050.0);
+      RANGE_TABLE.put(Units.feetToMeters(10.5), 4200.0);
+      RANGE_TABLE.put(Units.feetToMeters(11.0), 4350.0);
+      RANGE_TABLE.put(Units.feetToMeters(11.5), 4600.0);
+      RANGE_TABLE.put(Units.feetToMeters(12.0), 4800.0);
+      RANGE_TABLE.put(Units.feetToMeters(13.0), 5000.0);
     }
   }
 
