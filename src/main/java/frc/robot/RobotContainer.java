@@ -59,6 +59,16 @@ public class RobotContainer {
     NamedCommands.registerCommand("runIntake",  intakeSubsystem.intakeCommand());
     NamedCommands.registerCommand("stopIntake", intakeSubsystem.stopCommand());
 
+    // Shoot for a fixed duration using the range table and isFacingGoal as the ready gate.
+    // Adjust the timeout seconds to match how long you want the robot to feed balls.
+    final double SHOOT_DURATION_SECONDS = 2.0;
+    NamedCommands.registerCommand("shoot",
+        shooterSubsystem.shootOnReadyCommand(
+            () -> ShooterConstants.RANGE_TABLE.get(swerveSubsystem.getDistanceToHub()),
+            ShooterConstants.DEFAULT_FEED_RPM,
+            swerveSubsystem::isFacingGoal
+        ).withTimeout(SHOOT_DURATION_SECONDS));
+
     // Build chooser after NamedCommands are registered so that event markers have something to call
     autoChooser = new LoggedDashboardChooser<>("Auto Routine", AutoBuilder.buildAutoChooser("Test"));
   }

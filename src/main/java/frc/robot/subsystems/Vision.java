@@ -27,6 +27,8 @@ import org.photonvision.simulation.VisionSystemSim;
 import org.photonvision.targeting.PhotonPipelineResult;
 import org.photonvision.targeting.PhotonTrackedTarget;
 
+import org.littletonrobotics.junction.Logger;
+
 import swervelib.SwerveDrive;
 import swervelib.telemetry.SwerveDriveTelemetry;
 
@@ -97,26 +99,50 @@ public class Vision extends SubsystemBase {
       String name = entry.getKey();
       Cam cam = entry.getValue();
 
+      boolean connected = cam.camera.isConnected();
+      Logger.recordOutput("Vision/" + name + "/Connected", connected);
+
       // Get latest frame and estimate robot pose
       List<PhotonPipelineResult> frames = cam.camera.getAllUnreadResults();
-      if (frames.isEmpty()) {
+
+      if (!connected || frames.isEmpty()) {
+        Logger.recordOutput("Vision/" + name + "/TargetCount", 0);
+        Logger.recordOutput("Vision/" + name + "/HasEstimate", false);
         continue;
       }
 
       for (PhotonPipelineResult frame : frames) {
+        // Log per-frame diagnostics
+        int targetCount = frame.hasTargets() ? frame.getTargets().size() : 0;
+        Logger.recordOutput("Vision/" + name + "/TargetCount", targetCount);
+
+        if (frame.hasTargets()) {
+          // Log IDs and ambiguities of every visible tag
+          long[]   ids         = frame.getTargets().stream().mapToLong(PhotonTrackedTarget::getFiducialId).toArray();
+          double[] ambiguities = frame.getTargets().stream().mapToDouble(PhotonTrackedTarget::getPoseAmbiguity).toArray();
+          Logger.recordOutput("Vision/" + name + "/TagIDs",       ids);
+          Logger.recordOutput("Vision/" + name + "/TagAmbiguity", ambiguities);
+        }
+
         Optional<EstimatedRobotPose> estimate =  cam.estimator.estimateCoprocMultiTagPose(frame);
         if (estimate.isEmpty()) {
           // Fallback to lowest ambiguity if multi‑tag fails
           estimate = cam.estimator.estimateLowestAmbiguityPose(frame);
         }
 
+        Logger.recordOutput("Vision/" + name + "/HasEstimate", estimate.isPresent());
+
         if (estimate.isPresent()) {
           EstimatedRobotPose est = estimate.get();
+
+          Pose2d estimatedPose2d = est.estimatedPose.toPose2d();
+          Logger.recordOutput("Vision/" + name + "/EstimatedPose",    estimatedPose2d);
+          Logger.recordOutput("Vision/" + name + "/TagsUsedForPose",  est.targetsUsed.size());
 
           // Visualize
           if (field != null) {
             field.getObject("Vision/" + name + "/Estimate")
-                  .setPose(est.estimatedPose.toPose2d());
+                  .setPose(estimatedPose2d);
 
             var seen = new ArrayList<Pose2d>();
             if (frame.hasTargets()) {
@@ -156,6 +182,7 @@ public class Vision extends SubsystemBase {
           (est.targetsUsed.size() >= 2) ? VisionConstants.MULTI_TAG_STD_DEVS : VisionConstants.SINGLE_TAG_STD_DEVS;
 
       swerveDrive.addVisionMeasurement(est.estimatedPose.toPose2d(), est.timestampSeconds, stdDevs);
+      cam.lastEstimate = Optional.empty(); // Clear so the same frame isn't fed again next loop
     }
   }
 

@@ -238,9 +238,9 @@ public class SwerveSubsystem extends SubsystemBase{
 
         // Constrain to alliance's side of the hub
         // If the robot is on the wrong side, snap to the nearest valid boundary (±90°, Y-axis).
-        boolean onWrongSide = (alliance.get() == DriverStation.Alliance.Blue) ? norm.getX() > -1 : norm.getX() < 1;
+        boolean onWrongSide = (alliance.get() == DriverStation.Alliance.Blue) ? norm.getX() > 0 : norm.getX() < 0;
         if (onWrongSide) {
-            double clampedAngle = norm.getY() >= 0 ? Math.PI/4 : -Math.PI/4;
+            double clampedAngle = norm.getY() >= 0 ? Math.PI/2 : -Math.PI/2;
             norm = new Translation2d(Math.cos(clampedAngle), Math.sin(clampedAngle));
         }
 
