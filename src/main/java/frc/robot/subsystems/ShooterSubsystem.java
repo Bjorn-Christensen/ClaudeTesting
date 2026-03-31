@@ -25,6 +25,7 @@ public class ShooterSubsystem extends SubsystemBase {
     private final SparkFlex feedMotor;
     private final SparkFlex flywheelMotor;
     private final SparkFlex backRollerMotor;
+    private final SparkFlex agitatorMotor;
 
     private final SparkClosedLoopController feedController;
     private final SparkClosedLoopController flywheelController;
@@ -37,12 +38,14 @@ public class ShooterSubsystem extends SubsystemBase {
         feedMotor        = new SparkFlex(ShooterConstants.FEED_MOTOR_ID,        MotorType.kBrushless);
         flywheelMotor    = new SparkFlex(ShooterConstants.FLYWHEEL_MOTOR_ID,    MotorType.kBrushless);
         backRollerMotor  = new SparkFlex(ShooterConstants.BACK_ROLLER_MOTOR_ID, MotorType.kBrushless);
+        agitatorMotor    = new SparkFlex(ShooterConstants.AGITATOR_MOTOR_ID,    MotorType.kBrushless);
 
         // Feed motor — positive output moves ball toward the flywheel
         SparkFlexConfig feedConfig = new SparkFlexConfig();
         feedConfig.inverted(false);
         feedConfig.idleMode(IdleMode.kCoast);
         feedConfig.smartCurrentLimit(ShooterConstants.FEED_CURRENT_LIMIT);
+        feedConfig.voltageCompensation(12.0);
         feedConfig.closedLoop
             .feedbackSensor(FeedbackSensor.kPrimaryEncoder)
             .p(ShooterConstants.FEED_KP)
@@ -84,6 +87,13 @@ public class ShooterSubsystem extends SubsystemBase {
         backRollerConfig.closedLoopRampRate(ShooterConstants.BACK_ROLLER_RAMP_RATE);
         backRollerMotor.configure(backRollerConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
 
+        // Agitator — open-loop, runs whenever the feed is active
+        SparkFlexConfig agitatorConfig = new SparkFlexConfig();
+        agitatorConfig.inverted(false);
+        agitatorConfig.idleMode(IdleMode.kCoast);
+        agitatorConfig.smartCurrentLimit(ShooterConstants.AGITATOR_CURRENT_LIMIT);
+        agitatorMotor.configure(agitatorConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
+
         feedController       = feedMotor.getClosedLoopController();
         flywheelController   = flywheelMotor.getClosedLoopController();
         backRollerController = backRollerMotor.getClosedLoopController();
@@ -98,19 +108,21 @@ public class ShooterSubsystem extends SubsystemBase {
         backRollerController.setSetpoint(rpm * ShooterConstants.BACK_ROLLER_SPEED_RATIO, ControlType.kVelocity);
     }
 
-    /** Drive the feed motor at the given RPM. */
+    /** Drive the feed motor at the given RPM and run the agitator. */
     public void setFeedRpm(double rpm) {
         targetFeedRpm = rpm;
         feedController.setSetpoint(rpm, ControlType.kVelocity);
+        agitatorMotor.set(ShooterConstants.AGITATOR_SPEED);
     }
 
-    /** Stop all three shooter motors immediately. */
+    /** Stop all shooter motors immediately. */
     public void stopAll() {
         targetFlywheelRpm = 0.0;
         targetFeedRpm     = 0.0;
         flywheelMotor.stopMotor();
         backRollerMotor.stopMotor();
         feedMotor.stopMotor();
+        agitatorMotor.stopMotor();
     }
 
     // ---- Queries ----
@@ -152,6 +164,7 @@ public class ShooterSubsystem extends SubsystemBase {
             () -> setFeedRpm(rpm),
             () -> {
                 feedMotor.stopMotor();
+                agitatorMotor.stopMotor();
                 targetFeedRpm = 0.0;
             }
         );
@@ -171,6 +184,7 @@ public class ShooterSubsystem extends SubsystemBase {
                     setFeedRpm(feedRpm);
                 } else {
                     feedMotor.stopMotor();
+                    agitatorMotor.stopMotor();
                     targetFeedRpm = 0.0;
                 }
             },
@@ -200,8 +214,11 @@ public class ShooterSubsystem extends SubsystemBase {
         Logger.recordOutput("Shooter/Feed/ActualRPM",       feedMotor.getEncoder().getVelocity());
         Logger.recordOutput("Shooter/Feed/CurrentAmps",     feedMotor.getOutputCurrent());
         Logger.recordOutput("Shooter/Feed/Faults",          feedMotor.getFaults().rawBits);
-        Logger.recordOutput("Shooter/BackRoller/ActualRPM", backRollerMotor.getEncoder().getVelocity());
-        Logger.recordOutput("Shooter/BackRoller/Faults",    backRollerMotor.getFaults().rawBits);
-        Logger.recordOutput("Shooter/FlywheelAtSpeed",      flywheelAtSpeed());
+        Logger.recordOutput("Shooter/BackRoller/ActualRPM",  backRollerMotor.getEncoder().getVelocity());
+        Logger.recordOutput("Shooter/BackRoller/Faults",     backRollerMotor.getFaults().rawBits);
+        Logger.recordOutput("Shooter/Agitator/Output",       agitatorMotor.getAppliedOutput());
+        Logger.recordOutput("Shooter/Agitator/CurrentAmps",  agitatorMotor.getOutputCurrent());
+        Logger.recordOutput("Shooter/Agitator/Faults",       agitatorMotor.getFaults().rawBits);
+        Logger.recordOutput("Shooter/FlywheelAtSpeed",       flywheelAtSpeed());
     }
 }

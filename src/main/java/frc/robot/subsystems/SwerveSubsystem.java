@@ -97,12 +97,15 @@ public class SwerveSubsystem extends SubsystemBase{
 
     @Override
     public void periodic() {
-        swerveDrive.updateOdometry();
-        if (VisionConstants.CAMERAS_ENABLED) vision.updatePoseEstimation(swerveDrive);
+        if (VisionConstants.CAMERAS_ENABLED) {
+            swerveDrive.updateOdometry();
+            vision.updatePoseEstimation(swerveDrive);
+        }
 
         // Authoritative robot pose for AdvantageScope
         Logger.recordOutput("Robot/Pose", swerveDrive.getPose());
-        Logger.recordOutput("Robot/DistanceToHub", getDistanceToHub());
+        Logger.recordOutput("Robot/DistanceToHub",      getDistanceToHub());
+        Logger.recordOutput("Robot/DistanceToHubFeet", Units.metersToFeet(getDistanceToHub()));
     }
 
     @Override

@@ -53,7 +53,7 @@ public final class Constants {
   // Vision setup
   public static class VisionConstants {
     // Set to false when cameras are not physically connected (e.g. shooter testing)
-    public static final boolean CAMERAS_ENABLED = true;
+    public static final boolean CAMERAS_ENABLED = false;
 
     // One entry per camera you have configured in PhotonVision.
     // Height: 25 inches above robot center. Pitch: slightly upward to see field AprilTags.
@@ -111,12 +111,30 @@ public final class Constants {
     public static final double OUTTAKE_SPEED = -0.60; // eject game piece
   }
 
+  // Intake Pivot Constants
+  public static class IntakePivotConstants {
+    public static final int LEADER_MOTOR_ID   = 21; // SparkMax, NEO 550
+    public static final int FOLLOWER_MOTOR_ID = 22; // SparkMax, NEO 550
+
+    // NEO 550 safe peak current; limits current into the mechanical hard stop
+    public static final int PIVOT_CURRENT_LIMIT = 20;
+
+    // Duty-cycle output — positive rotates toward the bumper stop (down)
+    // Tune DEPLOY_SPEED first; reduce if the pivot hits the bumper too hard
+    public static final double PIVOT_DEPLOY_SPEED  =  0.30; // TUNE THIS
+    public static final double PIVOT_RETRACT_SPEED = -0.40; // TUNE THIS
+
+    // Follower is on the opposite side of the pivot point so it must be inverted
+    public static final boolean FOLLOWER_INVERTED = true;
+  }
+
   // Shooter Constants
   public static class ShooterConstants {
     // CAN IDs — update to match your robot's CAN bus
     public static final int FEED_MOTOR_ID        = 16;
     public static final int FLYWHEEL_MOTOR_ID    = 17;
     public static final int BACK_ROLLER_MOTOR_ID = 18;
+    public static final int AGITATOR_MOTOR_ID    = 19; // SparkFlex, NEO Vortex
 
     // Current limits (amps) — sized to match 40A PDP/PDH breakers and protect motors.
     // Flywheel: 50A allows fast spin-up while staying below breaker trip threshold.
@@ -124,6 +142,11 @@ public final class Constants {
     public static final int FLYWHEEL_CURRENT_LIMIT    = 50;
     public static final int FEED_CURRENT_LIMIT         = 30;
     public static final int BACK_ROLLER_CURRENT_LIMIT  = 40;
+    public static final int AGITATOR_CURRENT_LIMIT     = 30;
+
+    // Agitator duty-cycle speed — runs open-loop whenever the feed is active
+    // Positive = toward shooter; reduce if balls jam, increase if feed starves
+    public static final double AGITATOR_SPEED = 0.6; // TUNE THIS
 
     // Closed-loop ramp rates (seconds to reach full output) — prevents voltage sag on spin-up
     public static final double FLYWHEEL_RAMP_RATE    = 0.25;

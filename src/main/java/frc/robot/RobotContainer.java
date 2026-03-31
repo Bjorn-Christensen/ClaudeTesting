@@ -16,6 +16,7 @@ import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import frc.robot.Constants.DrivetrainConstants;
 import frc.robot.Constants.ControllerConstants;
 import frc.robot.Constants.ShooterConstants;
+import frc.robot.Constants.VisionConstants;
 import frc.robot.subsystems.IntakeSubsystem;
 import frc.robot.subsystems.ShooterSubsystem;
 import frc.robot.subsystems.SwerveSubsystem;
@@ -62,9 +63,9 @@ public class RobotContainer {
     // Shoot for a fixed duration using the range table and isFacingGoal as the ready gate.
     // Adjust the timeout seconds to match how long you want the robot to feed balls.
     final double SHOOT_DURATION_SECONDS = 2.0;
-    NamedCommands.registerCommand("shoot",
+    NamedCommands.registerCommand("shootBalls",
         shooterSubsystem.shootOnReadyCommand(
-            () -> ShooterConstants.RANGE_TABLE.get(swerveSubsystem.getDistanceToHub()),
+            this::flywheelRpm,
             ShooterConstants.DEFAULT_FEED_RPM,
             swerveSubsystem::isFacingGoal
         ).withTimeout(SHOOT_DURATION_SECONDS));
@@ -89,7 +90,7 @@ public class RobotContainer {
     // Use when cameras are off or during bench/distance testing.
     operatorXbox.leftBumper().whileTrue(
         shooterSubsystem.shootOnReadyCommand(
-            () -> ShooterConstants.RANGE_TABLE.get(swerveSubsystem.getDistanceToHub()),
+            this::flywheelRpm,
             ShooterConstants.DEFAULT_FEED_RPM,
             () -> true
         )
@@ -98,7 +99,7 @@ public class RobotContainer {
     // Hold right bumper to shoot — range-adjusted RPM, requires facing the goal.
     operatorXbox.rightBumper().whileTrue(
         shooterSubsystem.shootOnReadyCommand(
-            () -> ShooterConstants.RANGE_TABLE.get(swerveSubsystem.getDistanceToHub()),
+            this::flywheelRpm,
             ShooterConstants.DEFAULT_FEED_RPM,
             swerveSubsystem::isFacingGoal
         )
@@ -110,6 +111,13 @@ public class RobotContainer {
 
     // Hold X to eject / reverse intake rollers
     operatorXbox.x().whileTrue(intakeSubsystem.ejectCommand());
+
+    // Hold right trigger to deploy pivot; releasing auto-retracts
+    operatorXbox.rightTrigger(ControllerConstants.RIGHT_TRIGGER_DEADZONE)
+        .whileTrue(intakeSubsystem.deployPivotCommand());
+
+    // Hold B to retract pivot; release to stop
+    operatorXbox.b().whileTrue(intakeSubsystem.retractPivotCommand());
 
   }
 
@@ -130,6 +138,13 @@ public class RobotContainer {
     }
 
     return selected;
+  }
+
+  // Returns range-table RPM when vision pose is trustworthy, fixed default otherwise.
+  private double flywheelRpm() {
+    return VisionConstants.CAMERAS_ENABLED
+        ? ShooterConstants.RANGE_TABLE.get(swerveSubsystem.getDistanceToHub())
+        : ShooterConstants.DEFAULT_FLYWHEEL_RPM;
   }
 
   // Set drive Controls For Teleop
