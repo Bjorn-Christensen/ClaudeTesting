@@ -20,6 +20,10 @@ import edu.wpi.first.math.util.Units;
 
 public final class Constants {
 
+  // Set true during testing to enable live parameter adjustment from the dashboard.
+  // Always set false before competition — competition mode uses hard-coded constants only.
+  public static final boolean TUNING_MODE = true;
+
   public static final AprilTagFieldLayout APRIL_TAG_FIELD_LAYOUT = AprilTagFieldLayout.loadField(AprilTagFields.k2026RebuiltWelded);
 
   // Drivetrain Constants
@@ -100,80 +104,70 @@ public final class Constants {
 
   // Intake Constants
   public static class IntakeConstants {
-    // CAN ID — update to match your robot's CAN bus
-    public static final int ROLLER_MOTOR_ID = 20; // SparkFlex, NEO Vortex
+    // CAN IDs — update to match your robot's CAN bus
+    public static final int ROLLER_MOTOR_ID          = 20; // SparkFlex, NEO Vortex
+    public static final int PIVOT_LEADER_MOTOR_ID   = 21; // SparkMax, NEO 550
+    public static final int PIVOT_FOLLOWER_MOTOR_ID = 22; // SparkMax, NEO 550
 
-    // Current limit (amps) — 35A protects against hard game piece jams; still ample intake torque
+    // Current limits (amps)
+    // Roller: 35A protects against hard game piece jams; still ample intake torque
+    // Pivot:  NEO 550 safe peak current; limits current into the mechanical hard stop
     public static final int ROLLER_CURRENT_LIMIT = 35;
+    public static final int PIVOT_CURRENT_LIMIT  = 20;
 
     // Roller duty-cycle output
     public static final double INTAKE_SPEED  =  0.80; // intake game piece
     public static final double OUTTAKE_SPEED = -0.60; // eject game piece
-  }
 
-  // Intake Pivot Constants
-  public static class IntakePivotConstants {
-    public static final int LEADER_MOTOR_ID   = 21; // SparkMax, NEO 550
-    public static final int FOLLOWER_MOTOR_ID = 22; // SparkMax, NEO 550
-
-    // NEO 550 safe peak current; limits current into the mechanical hard stop
-    public static final int PIVOT_CURRENT_LIMIT = 20;
-
-    // Duty-cycle output — positive rotates toward the bumper stop (down)
+    // Pivot duty-cycle output — positive rotates toward the bumper stop (down)
     // Tune DEPLOY_SPEED first; reduce if the pivot hits the bumper too hard
     public static final double PIVOT_DEPLOY_SPEED  =  0.30; // TUNE THIS
     public static final double PIVOT_RETRACT_SPEED = -0.40; // TUNE THIS
 
-    // Follower is on the opposite side of the pivot point so it must be inverted
-    public static final boolean FOLLOWER_INVERTED = true;
+    // Pivot follower is on the opposite side of the pivot point so it must be inverted
+    public static final boolean PIVOT_FOLLOWER_INVERTED = true;
   }
 
   // Shooter Constants
   public static class ShooterConstants {
     // CAN IDs — update to match your robot's CAN bus
-    public static final int FEED_MOTOR_ID        = 16;
-    public static final int FLYWHEEL_MOTOR_ID    = 17;
-    public static final int BACK_ROLLER_MOTOR_ID = 18;
-    public static final int AGITATOR_MOTOR_ID    = 19; // SparkFlex, NEO Vortex
+    public static final int FEED_LEADER_MOTOR_ID   = 16;
+    public static final int FEED_FOLLOWER_MOTOR_ID = 17; // follows FEED_LEADER_MOTOR_ID, same direction
+    public static final int FLYWHEEL_MOTOR_ID      = 18;
+    public static final int AGITATOR_MOTOR_ID      = 19; // SparkFlex, NEO Vortex
 
     // Current limits (amps) — sized to match 40A PDP/PDH breakers and protect motors.
     // Flywheel: 50A allows fast spin-up while staying below breaker trip threshold.
     //           Reduce to 40A if breakers trip during match play.
-    public static final int FLYWHEEL_CURRENT_LIMIT    = 50;
-    public static final int FEED_CURRENT_LIMIT         = 30;
-    public static final int BACK_ROLLER_CURRENT_LIMIT  = 40;
-    public static final int AGITATOR_CURRENT_LIMIT     = 30;
+    // FEED_CURRENT_LIMIT is applied to both the feed leader and its follower.
+    public static final int FLYWHEEL_CURRENT_LIMIT = 50;
+    public static final int FEED_CURRENT_LIMIT     = 30;
+    public static final int AGITATOR_CURRENT_LIMIT = 30;
 
     // Agitator duty-cycle speed — runs open-loop whenever the feed is active
     // Positive = toward shooter; reduce if balls jam, increase if feed starves
     public static final double AGITATOR_SPEED = 0.6; // TUNE THIS
 
     // Closed-loop ramp rates (seconds to reach full output) — prevents voltage sag on spin-up
-    public static final double FLYWHEEL_RAMP_RATE    = 0.25;
-    public static final double FEED_RAMP_RATE         = 0.10;
-    public static final double BACK_ROLLER_RAMP_RATE  = 0.25;
+    public static final double FLYWHEEL_RAMP_RATE = 0.25;
+    public static final double FEED_RAMP_RATE     = 0.10;
 
-    // Flywheel & back roller PID — Neo Vortex starting values (tune on carpet)
+    // Flywheel PID — Neo Vortex starting values (tune on carpet)
     // kV = 1 / 6784 RPM (Neo Vortex free speed) — applied as duty-cycle per RPM
-    public static final double FLYWHEEL_KP  = 0.0002, FLYWHEEL_KI  = 0.0, FLYWHEEL_KD  = 0.0, FLYWHEEL_KV  = 0.000152;
-    public static final double BACK_ROLLER_KP = 0.0002, BACK_ROLLER_KI = 0.0, BACK_ROLLER_KD = 0.0, BACK_ROLLER_KV = 0.000152;
+    public static final double FLYWHEEL_KP = 0.0002, FLYWHEEL_KI = 0.0, FLYWHEEL_KD = 0.0, FLYWHEEL_KV = 0.000152;
 
     // Feed motor PID — tune separately; feed roller has a different load than the flywheel
-    public static final double FEED_KP  = 0.0002, FEED_KI  = 0.0, FEED_KD  = 0.0, FEED_KV  = 0.000152;
-
-    // Back roller speed as a fraction of flywheel RPM.
-    // 1.0 = matched speeds (no net spin, flattest trajectory)
-    // < 1.0 = flywheel wins → backspin → Magnus effect curves ball upward (steeper arc)
-    // > 1.0 = back roller wins → topspin → flatter arc
-    // Tune in 0.05 steps. Start at 0.85 to compensate for rolling entry.
-    public static final double BACK_ROLLER_SPEED_RATIO = 0.85;
+    public static final double FEED_KP = 0.0002, FEED_KI = 0.0, FEED_KD = 0.0, FEED_KV = 0.000152;
 
     // Flywheel considered at speed within this many RPM of target
     public static final double FLYWHEEL_RPM_TOLERANCE = 50.0;
 
     // Default RPMs (used as fallback; range table takes over during normal operation)
-    public static final double DEFAULT_FLYWHEEL_RPM = 4000.0;
-    public static final double DEFAULT_FEED_RPM     = 1500.0;
+    public static final double DEFAULT_FLYWHEEL_RPM  = 4000.0;
+    public static final double DEFAULT_FEED_RPM      = 1500.0;
+
+    // How long to keep feeding balls during an auto shoot sequence
+    public static final double SHOOT_DURATION_SECONDS = 2.0; // TUNE THIS
 
     // Distance (feet from hub center) → Flywheel RPM
     // Keys are written in feet for easy measurement with a tape measure.

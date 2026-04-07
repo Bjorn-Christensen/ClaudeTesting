@@ -36,210 +36,212 @@ import frc.robot.Constants;
 import frc.robot.Constants.VisionConstants;
 import frc.robot.Constants.CameraConfig;
 
-// Vision subsystem using PhotonVision that plugs into swervelib's pose estimator
+/**
+ * PhotonVision subsystem that plugs estimated robot poses into the swerve drive pose estimator.
+ */
 public class Vision extends SubsystemBase {
 
-  // ====== Context from the drive (for telemetry only) ======
-  private final Supplier<Pose2d> currentPoseSupplier; // used in sendable
-  private final Field2d field; // for visualization
+    // ---- Drive context (for telemetry) ----
+    private final Supplier<Pose2d> currentPoseSupplier;
+    private final Field2d field;
 
-  // One entry per camera.
-  private final Map<String, Cam> cams = new LinkedHashMap<>();
+    // ---- Cameras ----
+    private final Map<String, Cam> cams = new LinkedHashMap<>(); // one entry per camera
 
-  // --- Simulation-only members ---
-  private VisionSystemSim visionSim; // targets + cameras
+    // ---- Simulation ----
+    private VisionSystemSim visionSim;
+    private double visionPauseUntil = 0.0; // used to limit updates after reset
 
-  // Used to disable vision for very beginning of match and limit update freq
-  private double visionPauseUntil = 0.0;
+    public Vision(Supplier<Pose2d> currentPoseSupplier, Field2d field) {
+        this.currentPoseSupplier = currentPoseSupplier;
+        this.field = field;
 
-  public Vision(Supplier<Pose2d> currentPoseSupplier, Field2d field) {
-    this.currentPoseSupplier = currentPoseSupplier;
-    this.field = field;
+        // Build a camera + estimator for each configured camera in Constants.VisionConstants.CAMERAS
+        for (CameraConfig cfg : VisionConstants.CAMERAS) {
+            PhotonCamera camera = new PhotonCamera(cfg.name);
 
-    // Build a camera + estimator for each configured camera in Constants.Vision.CAMERAS
-    for (CameraConfig cfg : VisionConstants.CAMERAS) {
-      PhotonCamera camera = new PhotonCamera(cfg.name);
+            PhotonPoseEstimator estimator = new PhotonPoseEstimator(
+                Constants.APRIL_TAG_FIELD_LAYOUT,
+                cfg.robotToCam
+            );
 
-      PhotonPoseEstimator estimator = new PhotonPoseEstimator(
-          Constants.APRIL_TAG_FIELD_LAYOUT,
-          cfg.robotToCam
-      );
-
-      cams.put(cfg.name, new Cam(camera, estimator));
-    }
-
-    // Simulation Initialization
-    if (RobotBase.isSimulation()) {
-      visionSim = new VisionSystemSim("Vision");
-      visionSim.addAprilTags(Constants.APRIL_TAG_FIELD_LAYOUT);
-
-      for (CameraConfig cfg : VisionConstants.CAMERAS) {
-        Cam cam = cams.get(cfg.name);
-
-        // Camera properties (FOV, res, FPS)
-        cam.camProps = new SimCameraProperties();
-        cam.camProps.setCalibration(640, 480,             // width, height
-                                    Rotation2d.fromDegrees(100.0));  // diagonal FOV approx
-        cam.camProps.setFPS(30);
-        cam.camProps.setAvgLatencyMs(35);
-        cam.camProps.setLatencyStdDevMs(5);
-
-        cam.cameraSim = new PhotonCameraSim(cam.camera, cam.camProps);
-        cam.cameraSim.enableDrawWireframe(true);
-
-        visionSim.addCamera(cam.cameraSim, cfg.robotToCam);
-      }
-    }
-  }
-
-  @Override
-  public void periodic() {
-
-    for (var entry : cams.entrySet()) {
-      String name = entry.getKey();
-      Cam cam = entry.getValue();
-
-      boolean connected = cam.camera.isConnected();
-      Logger.recordOutput("Vision/" + name + "/Connected", connected);
-
-      // Get latest frame and estimate robot pose
-      List<PhotonPipelineResult> frames = cam.camera.getAllUnreadResults();
-
-      if (!connected || frames.isEmpty()) {
-        Logger.recordOutput("Vision/" + name + "/TargetCount", 0);
-        Logger.recordOutput("Vision/" + name + "/HasEstimate", false);
-        continue;
-      }
-
-      for (PhotonPipelineResult frame : frames) {
-        // Log per-frame diagnostics
-        int targetCount = frame.hasTargets() ? frame.getTargets().size() : 0;
-        Logger.recordOutput("Vision/" + name + "/TargetCount", targetCount);
-
-        if (frame.hasTargets()) {
-          // Log IDs and ambiguities of every visible tag
-          long[]   ids         = frame.getTargets().stream().mapToLong(PhotonTrackedTarget::getFiducialId).toArray();
-          double[] ambiguities = frame.getTargets().stream().mapToDouble(PhotonTrackedTarget::getPoseAmbiguity).toArray();
-          Logger.recordOutput("Vision/" + name + "/TagIDs",       ids);
-          Logger.recordOutput("Vision/" + name + "/TagAmbiguity", ambiguities);
+            cams.put(cfg.name, new Cam(camera, estimator));
         }
 
-        Optional<EstimatedRobotPose> estimate =  cam.estimator.estimateCoprocMultiTagPose(frame);
-        if (estimate.isEmpty()) {
-          // Fallback to lowest ambiguity if multi‑tag fails
-          estimate = cam.estimator.estimateLowestAmbiguityPose(frame);
-        }
+        // Simulation initialization
+        if (RobotBase.isSimulation()) {
+            visionSim = new VisionSystemSim("Vision");
+            visionSim.addAprilTags(Constants.APRIL_TAG_FIELD_LAYOUT);
 
-        Logger.recordOutput("Vision/" + name + "/HasEstimate", estimate.isPresent());
+            for (CameraConfig cfg : VisionConstants.CAMERAS) {
+                Cam cam = cams.get(cfg.name);
 
-        if (estimate.isPresent()) {
-          EstimatedRobotPose est = estimate.get();
+                // Camera properties (FOV, res, FPS)
+                cam.camProps = new SimCameraProperties();
+                cam.camProps.setCalibration(640, 480,               // width, height
+                                            Rotation2d.fromDegrees(100.0)); // diagonal FOV approx
+                cam.camProps.setFPS(30);
+                cam.camProps.setAvgLatencyMs(35);
+                cam.camProps.setLatencyStdDevMs(5);
 
-          Pose2d estimatedPose2d = est.estimatedPose.toPose2d();
-          Logger.recordOutput("Vision/" + name + "/EstimatedPose",    estimatedPose2d);
-          Logger.recordOutput("Vision/" + name + "/TagsUsedForPose",  est.targetsUsed.size());
+                cam.cameraSim = new PhotonCameraSim(cam.camera, cam.camProps);
+                cam.cameraSim.enableDrawWireframe(true);
 
-          // Visualize
-          if (field != null) {
-            field.getObject("Vision/" + name + "/Estimate")
-                  .setPose(estimatedPose2d);
-
-            var seen = new ArrayList<Pose2d>();
-            if (frame.hasTargets()) {
-              for (PhotonTrackedTarget t : frame.getTargets()) {
-                try {
-                  Optional<Pose3d> tagPose =
-                      Constants.APRIL_TAG_FIELD_LAYOUT.getTagPose(t.getFiducialId());
-                  tagPose.ifPresent(p3 -> seen.add(p3.toPose2d()));
-                } catch (Exception ignored) {}
-              }
+                visionSim.addCamera(cam.cameraSim, cfg.robotToCam);
             }
-            field.getObject("Vision/" + name + "/SeenTags").setPoses(seen);
-          }
-
-          // Store so updatePoseEstimation() can feed it to the swerve drive
-          cam.lastEstimate = estimate;
-
-          // Only handle first valid estimate per set of frames
-          break;
         }
-      }
     }
-  }
 
-  // Pushes all valid camera estimates into the pose estimator.
-  public void updatePoseEstimation(SwerveDrive swerveDrive) {
-    double now = edu.wpi.first.wpilibj.Timer.getFPGATimestamp();
+    // ---- Periodic ----
 
-    // Causes loop overrun but only used in sim to maintain camera-drivetrain pose connection
-    if (now < visionPauseUntil) return;   // Short quiet period after any reset
+    @Override
+    public void periodic() {
+        for (var entry : cams.entrySet()) {
+            String name = entry.getKey();
+            Cam cam = entry.getValue();
 
-    for (Cam cam : cams.values()) {
-      if (cam.lastEstimate.isEmpty()) continue;
-      EstimatedRobotPose est = cam.lastEstimate.get();
-      if (est.timestampSeconds < visionPauseUntil) continue; // Drop pre-reset frames
-      Matrix<N3, N1> stdDevs =
-          (est.targetsUsed.size() >= 2) ? VisionConstants.MULTI_TAG_STD_DEVS : VisionConstants.SINGLE_TAG_STD_DEVS;
+            boolean connected = cam.camera.isConnected();
+            Logger.recordOutput("Vision/" + name + "/Connected", connected);
 
-      swerveDrive.addVisionMeasurement(est.estimatedPose.toPose2d(), est.timestampSeconds, stdDevs);
-      cam.lastEstimate = Optional.empty(); // Clear so the same frame isn't fed again next loop
-    }
-  }
+            // Get latest frame and estimate robot pose
+            List<PhotonPipelineResult> frames = cam.camera.getAllUnreadResults();
 
-  // =================== Public helpers ===================
+            if (!connected || frames.isEmpty()) {
+                Logger.recordOutput("Vision/" + name + "/TargetCount", 0);
+                Logger.recordOutput("Vision/" + name + "/HasEstimate", false);
+                continue;
+            }
 
-  // Nearest AprilTag Pose2d from a list
-  public Pose2d nearestTagFromList(int[] tagIds, SwerveDrive swerveDrive) {
-    Pose2d ref = currentPoseSupplier.get();
-    if (SwerveDriveTelemetry.isSimulation && swerveDrive.getSimulationDriveTrainPose().isPresent()) {
-      ref = swerveDrive.getSimulationDriveTrainPose().get();
-    }
-    Pose2d nearest = null;
-    double minMeters = Double.MAX_VALUE;
+            for (PhotonPipelineResult frame : frames) {
+                // Log per-frame diagnostics
+                int targetCount = frame.hasTargets() ? frame.getTargets().size() : 0;
+                Logger.recordOutput("Vision/" + name + "/TargetCount", targetCount);
 
-    for (int id : tagIds) {
-      // Simple sanity check that april tag list was correctly built in Constants file
-      try {
-        Optional<Pose3d> pose3d = Constants.APRIL_TAG_FIELD_LAYOUT.getTagPose(id);
-        if (pose3d.isEmpty()) continue;
+                if (frame.hasTargets()) {
+                    // Log IDs and ambiguities of every visible tag
+                    long[]   ids         = frame.getTargets().stream().mapToLong(PhotonTrackedTarget::getFiducialId).toArray();
+                    double[] ambiguities = frame.getTargets().stream().mapToDouble(PhotonTrackedTarget::getPoseAmbiguity).toArray();
+                    Logger.recordOutput("Vision/" + name + "/TagIDs",       ids);
+                    Logger.recordOutput("Vision/" + name + "/TagAmbiguity", ambiguities);
+                }
 
-        Pose2d tag2d = pose3d.get().toPose2d();
-        double d = ref.getTranslation().getDistance(tag2d.getTranslation());
-        if (d < minMeters) {
-          minMeters = d;
-          nearest = tag2d;
+                Optional<EstimatedRobotPose> estimate = cam.estimator.estimateCoprocMultiTagPose(frame);
+                if (estimate.isEmpty()) {
+                    // Fallback to lowest ambiguity if multi-tag fails
+                    estimate = cam.estimator.estimateLowestAmbiguityPose(frame);
+                }
+
+                Logger.recordOutput("Vision/" + name + "/HasEstimate", estimate.isPresent());
+
+                if (estimate.isPresent()) {
+                    EstimatedRobotPose est = estimate.get();
+
+                    Pose2d estimatedPose2d = est.estimatedPose.toPose2d();
+                    Logger.recordOutput("Vision/" + name + "/EstimatedPose",   estimatedPose2d);
+                    Logger.recordOutput("Vision/" + name + "/TagsUsedForPose", est.targetsUsed.size());
+
+                    // Visualize
+                    if (field != null) {
+                        field.getObject("Vision/" + name + "/Estimate")
+                             .setPose(estimatedPose2d);
+
+                        var seen = new ArrayList<Pose2d>();
+                        if (frame.hasTargets()) {
+                            for (PhotonTrackedTarget t : frame.getTargets()) {
+                                try {
+                                    Optional<Pose3d> tagPose =
+                                        Constants.APRIL_TAG_FIELD_LAYOUT.getTagPose(t.getFiducialId());
+                                    tagPose.ifPresent(p3 -> seen.add(p3.toPose2d()));
+                                } catch (Exception ignored) {}
+                            }
+                        }
+                        field.getObject("Vision/" + name + "/SeenTags").setPoses(seen);
+                    }
+
+                    // Store so updatePoseEstimation() can feed it to the swerve drive
+                    cam.lastEstimate = estimate;
+
+                    // Only handle first valid estimate per set of frames
+                    break;
+                }
+            }
         }
-      } catch (Exception ignored) {}
     }
-    return nearest;
-  }
 
-  // Called from SwerveSubsystem.simulationPeriodic() to avoid loop overruns in periodic()
-  public void updateSim(Pose2d simPose) {
-    if (visionSim != null) {
-      visionSim.update(simPose);
+    // ---- Public helpers ----
+
+    /** Push all valid camera estimates into the swerve drive pose estimator. */
+    public void updatePoseEstimation(SwerveDrive swerveDrive) {
+        double now = edu.wpi.first.wpilibj.Timer.getFPGATimestamp();
+
+        // Causes loop overrun but only used in sim to maintain camera-drivetrain pose connection
+        if (now < visionPauseUntil) return; // short quiet period after any reset
+
+        for (Cam cam : cams.values()) {
+            if (cam.lastEstimate.isEmpty()) continue;
+            EstimatedRobotPose est = cam.lastEstimate.get();
+            if (est.timestampSeconds < visionPauseUntil) continue; // drop pre-reset frames
+            Matrix<N3, N1> stdDevs =
+                (est.targetsUsed.size() >= 2) ? VisionConstants.MULTI_TAG_STD_DEVS : VisionConstants.SINGLE_TAG_STD_DEVS;
+
+            swerveDrive.addVisionMeasurement(est.estimatedPose.toPose2d(), est.timestampSeconds, stdDevs);
+            cam.lastEstimate = Optional.empty(); // clear so the same frame isn't fed again next loop
+        }
     }
-  }
 
-  // Mostly used for start of simulation to ignore robot pose teleportation
-  public void pauseVisionFor(double seconds) {
-    visionPauseUntil = Timer.getFPGATimestamp() + seconds;
-  }
+    /** Returns the nearest AprilTag Pose2d from the given list of tag IDs. */
+    public Pose2d nearestTagFromList(int[] tagIds, SwerveDrive swerveDrive) {
+        Pose2d ref = currentPoseSupplier.get();
+        if (SwerveDriveTelemetry.isSimulation && swerveDrive.getSimulationDriveTrainPose().isPresent()) {
+            ref = swerveDrive.getSimulationDriveTrainPose().get();
+        }
+        Pose2d nearest = null;
+        double minMeters = Double.MAX_VALUE;
 
-  // =================== Internal per-camera structure ===================
-  private static class Cam {
-    final PhotonCamera camera;
-    final PhotonPoseEstimator estimator;
+        for (int id : tagIds) {
+            // Simple sanity check that april tag list was correctly built in Constants file
+            try {
+                Optional<Pose3d> pose3d = Constants.APRIL_TAG_FIELD_LAYOUT.getTagPose(id);
+                if (pose3d.isEmpty()) continue;
 
-    // --- Simulation-only per-camera ---
-    PhotonCameraSim cameraSim;
-    SimCameraProperties camProps;
-
-    Optional<EstimatedRobotPose> lastEstimate = Optional.empty();
-
-    Cam(PhotonCamera camera, PhotonPoseEstimator estimator) {
-      this.camera = camera;
-      this.estimator = estimator;
+                Pose2d tag2d = pose3d.get().toPose2d();
+                double d = ref.getTranslation().getDistance(tag2d.getTranslation());
+                if (d < minMeters) {
+                    minMeters = d;
+                    nearest = tag2d;
+                }
+            } catch (Exception ignored) {}
+        }
+        return nearest;
     }
-  }
+
+    /** Update the simulated camera positions; called from SwerveSubsystem.simulationPeriodic(). */
+    public void updateSim(Pose2d simPose) {
+        if (visionSim != null) {
+            visionSim.update(simPose);
+        }
+    }
+
+    /** Ignore vision updates for the given number of seconds — used after a pose reset. */
+    public void pauseVisionFor(double seconds) {
+        visionPauseUntil = Timer.getFPGATimestamp() + seconds;
+    }
+
+    // ---- Internal per-camera structure ----
+
+    private static class Cam {
+        final PhotonCamera camera;
+        final PhotonPoseEstimator estimator;
+
+        // Simulation-only per-camera fields
+        PhotonCameraSim cameraSim;
+        SimCameraProperties camProps;
+
+        Optional<EstimatedRobotPose> lastEstimate = Optional.empty();
+
+        Cam(PhotonCamera camera, PhotonPoseEstimator estimator) {
+            this.camera = camera;
+            this.estimator = estimator;
+        }
+    }
 }

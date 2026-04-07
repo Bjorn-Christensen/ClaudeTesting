@@ -20,6 +20,7 @@ import frc.robot.Constants.VisionConstants;
 import frc.robot.subsystems.IntakeSubsystem;
 import frc.robot.subsystems.ShooterSubsystem;
 import frc.robot.subsystems.SwerveSubsystem;
+import frc.robot.util.TunableNumber;
 
 import swervelib.SwerveInputStream;
 
@@ -37,8 +38,17 @@ public class RobotContainer {
   // Auton Chooser
   private final LoggedDashboardChooser<Command> autoChooser;
 
-  // Subsystem requirements required for commands writting direct within subsystem class
-  private final Set<Subsystem> swerveReq = Set.of(swerveSubsystem);
+  // Subsystem requirements for deferred commands (required by Commands.defer)
+  private final Set<Subsystem> swerveReq   = Set.of(swerveSubsystem);
+  private final Set<Subsystem> shooterReq  = Set.of(shooterSubsystem);
+
+  // ---- Tunable parameters ----
+  private static final TunableNumber kDefaultFlywheelRpm  =
+      new TunableNumber("Tuning/Shooter/DefaultFlywheelRPM",  ShooterConstants.DEFAULT_FLYWHEEL_RPM);
+  private static final TunableNumber kDefaultFeedRpm      =
+      new TunableNumber("Tuning/Shooter/DefaultFeedRPM",      ShooterConstants.DEFAULT_FEED_RPM);
+  private static final TunableNumber kShootDuration       =
+      new TunableNumber("Tuning/Shooter/ShootDurationSecs",   ShooterConstants.SHOOT_DURATION_SECONDS);
 
   // Converts driver input into a field-relative ChassisSpeeds that is controlled by angular velocity.
   SwerveInputStream driveAngularVelocity = SwerveInputStream.of(swerveSubsystem.getSwerveDrive(),
@@ -56,19 +66,20 @@ public class RobotContainer {
 
     // Register named commands for PathPlanner
     NamedCommands.registerCommand("lineUpShot",
-        Commands.defer(() -> swerveSubsystem.lineUpForShooter(), Set.of(swerveSubsystem)));
-    NamedCommands.registerCommand("runIntake",  intakeSubsystem.intakeCommand());
-    NamedCommands.registerCommand("stopIntake", intakeSubsystem.stopCommand());
+        Commands.defer(() -> swerveSubsystem.lineUpForShooter(), swerveReq));
+    NamedCommands.registerCommand("deployIntake",  intakeSubsystem.deployPivotCommand());
+    NamedCommands.registerCommand("retractIntake", intakeSubsystem.retractPivotCommand());
+    NamedCommands.registerCommand("runIntake",     intakeSubsystem.intakeCommand());
+    NamedCommands.registerCommand("stopIntake",    intakeSubsystem.stopCommand());
 
     // Shoot for a fixed duration using the range table and isFacingGoal as the ready gate.
-    // Adjust the timeout seconds to match how long you want the robot to feed balls.
-    final double SHOOT_DURATION_SECONDS = 2.0;
+    // Commands.defer() re-evaluates the tunable values each time the command is scheduled.
     NamedCommands.registerCommand("shootBalls",
-        shooterSubsystem.shootOnReadyCommand(
+        Commands.defer(() -> shooterSubsystem.shootOnReadyCommand(
             this::flywheelRpm,
-            ShooterConstants.DEFAULT_FEED_RPM,
+            kDefaultFeedRpm.get(),
             swerveSubsystem::isFacingGoal
-        ).withTimeout(SHOOT_DURATION_SECONDS));
+        ).withTimeout(kShootDuration.get()), shooterReq));
 
     // Build chooser after NamedCommands are registered so that event markers have something to call
     autoChooser = new LoggedDashboardChooser<>("Auto Routine", AutoBuilder.buildAutoChooser("Test"));
@@ -76,7 +87,7 @@ public class RobotContainer {
 
   private void configureButtonBindings() {
 
-    // ---- Driver controller (port 0) — driving only ----
+    // ---- Driver controller (port 0) — driving & shooting (triggers) ----
 
     // Auto line-up to shooting position
     controllerXbox.povUp().onTrue(Commands.defer(() -> swerveSubsystem.lineUpForShooter(), swerveReq));
@@ -84,40 +95,40 @@ public class RobotContainer {
     // Reset odometry to (0,0) — useful during testing/practice, never press mid-match
     controllerXbox.povLeft().onTrue(Commands.runOnce(() -> swerveSubsystem.resetOdometry(new Pose2d()), swerveSubsystem));
 
-    // ---- Operator controller (port 1) — shooter & intake ----
-
-    // Hold left bumper to test-shoot — range-adjusted RPM, no facing-goal check.
+    // Hold left trigger to test-shoot — range-adjusted RPM, no facing-goal check.
     // Use when cameras are off or during bench/distance testing.
-    operatorXbox.leftBumper().whileTrue(
-        shooterSubsystem.shootOnReadyCommand(
+    controllerXbox.leftTrigger(ControllerConstants.LEFT_TRIGGER_DEADZONE).whileTrue(
+        Commands.defer(() -> shooterSubsystem.shootOnReadyCommand(
             this::flywheelRpm,
-            ShooterConstants.DEFAULT_FEED_RPM,
+            kDefaultFeedRpm.get(),
             () -> true
-        )
+        ), shooterReq)
     );
 
-    // Hold right bumper to shoot — range-adjusted RPM, requires facing the goal.
-    operatorXbox.rightBumper().whileTrue(
-        shooterSubsystem.shootOnReadyCommand(
+    // Hold right trigger to shoot — range-adjusted RPM, requires facing the goal.
+    controllerXbox.rightTrigger(ControllerConstants.RIGHT_TRIGGER_DEADZONE).whileTrue(
+        Commands.defer(() -> shooterSubsystem.shootOnReadyCommand(
             this::flywheelRpm,
-            ShooterConstants.DEFAULT_FEED_RPM,
+            kDefaultFeedRpm.get(),
             swerveSubsystem::isFacingGoal
-        )
+        ), shooterReq)
     );
+
+    // ---- Operator controller (port 1) — intake ----
 
     // Hold left trigger to run intake rollers inward
     operatorXbox.leftTrigger(ControllerConstants.LEFT_TRIGGER_DEADZONE)
         .whileTrue(intakeSubsystem.intakeCommand());
 
-    // Hold X to eject / reverse intake rollers
-    operatorXbox.x().whileTrue(intakeSubsystem.ejectCommand());
-
-    // Hold right trigger to deploy pivot; releasing auto-retracts
+    // Hold right trigger to eject / reverse intake rollers
     operatorXbox.rightTrigger(ControllerConstants.RIGHT_TRIGGER_DEADZONE)
-        .whileTrue(intakeSubsystem.deployPivotCommand());
+        .whileTrue(intakeSubsystem.ejectCommand());
 
-    // Hold B to retract pivot; release to stop
-    operatorXbox.b().whileTrue(intakeSubsystem.retractPivotCommand());
+    // Hold left bumper to deploy pivot; releasing coasts to bumper stop
+    operatorXbox.leftBumper().whileTrue(intakeSubsystem.deployPivotCommand());
+
+    // Hold right bumper to retract pivot; release to stop
+    operatorXbox.rightBumper().whileTrue(intakeSubsystem.retractPivotCommand());
 
   }
 
@@ -140,11 +151,11 @@ public class RobotContainer {
     return selected;
   }
 
-  // Returns range-table RPM when vision pose is trustworthy, fixed default otherwise.
+  // Returns range-table RPM when vision pose is trustworthy, tunable default otherwise.
   private double flywheelRpm() {
     return VisionConstants.CAMERAS_ENABLED
         ? ShooterConstants.RANGE_TABLE.get(swerveSubsystem.getDistanceToHub())
-        : ShooterConstants.DEFAULT_FLYWHEEL_RPM;
+        : kDefaultFlywheelRpm.get();
   }
 
   // Set drive Controls For Teleop

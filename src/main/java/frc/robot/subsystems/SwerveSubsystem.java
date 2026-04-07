@@ -37,23 +37,23 @@ import frc.robot.Constants.FieldConstants;
 import frc.robot.Constants.DrivetrainConstants;
 import frc.robot.Constants.VisionConstants;
 
-public class SwerveSubsystem extends SubsystemBase{
+public class SwerveSubsystem extends SubsystemBase {
 
     private final SwerveDrive swerveDrive;
     private Vision vision;
 
-    // Precision Scoring PID Controller
+    // Precision scoring PID controller
     private final HolonomicDriveController precisionHDC;
-    private static final double POS_TOL_M = 0.05;   // tolerance in meters
-    private static final double ANG_TOL_RAD = Math.toRadians(2.0); // tolerance in degrees
+    private static final double POS_TOL_M              = 0.05;                // tolerance in meters
+    private static final double ANG_TOL_RAD            = Math.toRadians(2.0); // tolerance in radians
     private static final double FACING_GOAL_TOLERANCE_DEG = 5.0;
 
     public SwerveSubsystem(File directory) {
 
-        // Configure the Telemetry before creating the SwerveDrive to avoid unnecessary objects being created.
+        // Configure telemetry before creating the SwerveDrive to avoid unnecessary objects being created.
         SwerveDriveTelemetry.verbosity = TelemetryVerbosity.NONE;
         try {
-            swerveDrive = new SwerveParser(directory).createSwerveDrive(DrivetrainConstants.MAX_SPEED); // Initialize SwerveDrive Object
+            swerveDrive = new SwerveParser(directory).createSwerveDrive(DrivetrainConstants.MAX_SPEED);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -79,7 +79,9 @@ public class SwerveSubsystem extends SubsystemBase{
                     2.0 * swerveDrive.getMaximumChassisAngularVelocity())));
     }
 
-    // Drive the robot given a chassis field oriented velocity.
+    // ---- Drive ----
+
+    /** Drive the robot given a chassis field-oriented velocity. */
     public Command driveFieldOriented(Supplier<ChassisSpeeds> velocity) {
         return run(() -> {
             swerveDrive.driveFieldOriented(velocity.get());
@@ -90,10 +92,14 @@ public class SwerveSubsystem extends SubsystemBase{
         return swerveDrive;
     }
 
-    // Create vision object
+    // ---- Vision ----
+
+    /** Create the PhotonVision subsystem and attach it to the swerve drive pose estimator. */
     public void setupPhotonVision() {
         vision = new Vision(swerveDrive::getPose, swerveDrive.field);
     }
+
+    // ---- Periodic ----
 
     @Override
     public void periodic() {
@@ -103,8 +109,8 @@ public class SwerveSubsystem extends SubsystemBase{
         }
 
         // Authoritative robot pose for AdvantageScope
-        Logger.recordOutput("Robot/Pose", swerveDrive.getPose());
-        Logger.recordOutput("Robot/DistanceToHub",      getDistanceToHub());
+        Logger.recordOutput("Robot/Pose",              swerveDrive.getPose());
+        Logger.recordOutput("Robot/DistanceToHub",     getDistanceToHub());
         Logger.recordOutput("Robot/DistanceToHubFeet", Units.metersToFeet(getDistanceToHub()));
     }
 
@@ -114,6 +120,8 @@ public class SwerveSubsystem extends SubsystemBase{
         if (VisionConstants.CAMERAS_ENABLED)
             swerveDrive.getSimulationDriveTrainPose().ifPresent(vision::updateSim);
     }
+
+    // ---- State ----
 
     public Pose2d getPose() {
         return swerveDrive.getPose();
@@ -130,17 +138,15 @@ public class SwerveSubsystem extends SubsystemBase{
     public void setMotorBrake(boolean brake) {
         swerveDrive.setMotorIdleMode(brake);
     }
-    
-    // --------------------------------------------
-    // Pathplanner Functions / Autonomous Control
-    // --------------------------------------------
 
-    // Create a path following command using AutoBuilder. This will also trigger event markers.
+    // ---- PathPlanner / Autonomous Control ----
+
+    /** Create a path following command using AutoBuilder. This will also trigger event markers. */
     public Command getAutonomousCommand(String pathName) {
         return new PathPlannerAuto(pathName);
     }
 
-    // Setup the PathPlanner, taken directly from YAGSL, don't change other than PPHolonomicController PIDs
+    /** Set up PathPlanner AutoBuilder; taken directly from YAGSL — only tune PPHolonomicController PIDs. */
     public void setupPathPlanner() {
         // Load the RobotConfig from the GUI settings.
         RobotConfig config;
@@ -153,22 +159,21 @@ public class SwerveSubsystem extends SubsystemBase{
                 this::resetOdometry,
                 this::getRobotVelocity,
                 (speedsRobotRelative, moduleFeedForwards) -> {
-                        swerveDrive.drive(
-                            speedsRobotRelative,
-                            swerveDrive.kinematics.toSwerveModuleStates(speedsRobotRelative),
-                            moduleFeedForwards.linearForces());
+                    swerveDrive.drive(
+                        speedsRobotRelative,
+                        swerveDrive.kinematics.toSwerveModuleStates(speedsRobotRelative),
+                        moduleFeedForwards.linearForces());
                 },
-                // PPHolonomicController is the built in path following controller for holonomic drive trains
+                // PPHolonomicController is the built-in path following controller for holonomic drive trains
                 new PPHolonomicDriveController(
                     new PIDConstants(10.0, 0.0, 4.0), // Translation PID constants
-                    new PIDConstants(3.0, 0.0, 0.2) // Rotation PID constants
+                    new PIDConstants(3.0, 0.0, 0.2)   // Rotation PID constants
                 ),
                 config,
                 () -> {
-                    // Boolean supplier that controls when the path will be mirrored for the red alliance
+                    // Boolean supplier that controls when the path will be mirrored for the red alliance.
                     // This will flip the path being followed to the red side of the field.
                     // THE ORIGIN WILL REMAIN ON THE BLUE SIDE
-
                     var alliance = DriverStation.getAlliance();
                     if (alliance.isPresent()) {
                         return alliance.get() == DriverStation.Alliance.Red;
@@ -181,22 +186,24 @@ public class SwerveSubsystem extends SubsystemBase{
             e.printStackTrace();
         }
 
-        //Preload PathPlanner Path finding
+        // Preload PathPlanner path finding
         PathfindingCommand.warmupCommand();
     }
 
-    // Resets odometry for simulation
+    /** Set odometry to the auto start pose and suppress stale vision frames. */
     public void primeStartingPose(Pose2d start) {
         // Put odometry at the auto start pose before the match starts
-        resetOdometry(start); 
-      
+        resetOdometry(start);
+
         // Tell vision to align
         if (VisionConstants.CAMERAS_ENABLED && SwerveDriveTelemetry.isSimulation) {
-          vision.pauseVisionFor(0.35);    // ~ camera latency + buffer
+            vision.pauseVisionFor(0.35); // ~ camera latency + buffer
         }
     }
-    
-    // Returns the straight-line distance in meters from the robot to the hub center
+
+    // ---- Hub Targeting ----
+
+    /** Returns the straight-line distance in meters from the robot to the hub center. */
     public double getDistanceToHub() {
         var alliance = DriverStation.getAlliance();
         Pose2d hubPose = (alliance.isPresent() && alliance.get() == DriverStation.Alliance.Blue)
@@ -204,7 +211,7 @@ public class SwerveSubsystem extends SubsystemBase{
         return getPose().getTranslation().getDistance(hubPose.getTranslation());
     }
 
-    // Returns true when the robot's heading is within FACING_GOAL_TOLERANCE_DEG of the hub
+    /** Returns true when the robot's heading is within FACING_GOAL_TOLERANCE_DEG of the hub. */
     public boolean isFacingGoal() {
         var alliance = DriverStation.getAlliance();
         if (alliance.isEmpty()) return false;
@@ -217,14 +224,17 @@ public class SwerveSubsystem extends SubsystemBase{
         return Math.abs(getPose().getRotation().minus(required).getDegrees()) < FACING_GOAL_TOLERANCE_DEG;
     }
 
-    // Move to ideal hub distance and rotate to face goal, begin flywheel rotation
+    /**
+     * Navigate to the ideal shooting position (HUB_STANDOFF_DISTANCE from hub center) and rotate
+     * to face the hub. Uses PathPlanner pathfinding followed by precision PID line-up.
+     */
     public Command lineUpForShooter() {
 
         Pose2d hubPose;
         var alliance = DriverStation.getAlliance();
-        if(alliance.isPresent() && alliance.get() == DriverStation.Alliance.Blue) {
+        if (alliance.isPresent() && alliance.get() == DriverStation.Alliance.Blue) {
             hubPose = FieldConstants.HUB_POSE_BLUE;
-        } else if(alliance.isPresent()) {
+        } else if (alliance.isPresent()) {
             hubPose = FieldConstants.HUB_POSE_RED;
         } else {
             return Commands.print("No Alliance Selected: Can't Shoot");
@@ -232,18 +242,18 @@ public class SwerveSubsystem extends SubsystemBase{
 
         Translation2d curTranslation = swerveDrive.getPose().getTranslation();
         Translation2d hubTranslation = hubPose.getTranslation();
-        Translation2d vecHubToRobot = curTranslation.minus(hubTranslation); // Vector from hub → robot
+        Translation2d vecHubToRobot  = curTranslation.minus(hubTranslation); // Vector from hub → robot
         double magnitude = vecHubToRobot.getNorm();
         if (magnitude < 0.01) {
             return Commands.print("Robot too close to hub center: can't compute approach direction");
         }
         Translation2d norm = vecHubToRobot.div(magnitude);
 
-        // Constrain to alliance's side of the hub
+        // Constrain to alliance's side of the hub.
         // If the robot is on the wrong side, snap to the nearest valid boundary (±90°, Y-axis).
         boolean onWrongSide = (alliance.get() == DriverStation.Alliance.Blue) ? norm.getX() > 0 : norm.getX() < 0;
         if (onWrongSide) {
-            double clampedAngle = norm.getY() >= 0 ? Math.PI/2 : -Math.PI/2;
+            double clampedAngle = norm.getY() >= 0 ? Math.PI / 2 : -Math.PI / 2;
             norm = new Translation2d(Math.cos(clampedAngle), Math.sin(clampedAngle));
         }
 
@@ -262,10 +272,9 @@ public class SwerveSubsystem extends SubsystemBase{
             // Goal end velocity in meters/sec
             edu.wpi.first.units.Units.MetersPerSecond.of(0))
             .andThen(precisionLineUp(targetPose));
-
     }
 
-    // Line up precise and "slow"
+    /** PID-based final approach to a target pose; locks the robot when at reference. */
     public Command precisionLineUp(Pose2d targetPose) {
 
         precisionHDC.setTolerance(new Pose2d(POS_TOL_M, POS_TOL_M, new Rotation2d(ANG_TOL_RAD)));
@@ -292,5 +301,4 @@ public class SwerveSubsystem extends SubsystemBase{
             .until(precisionHDC::atReference)
             .withTimeout(1.0));
     }
-    
 }
