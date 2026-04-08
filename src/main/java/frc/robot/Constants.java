@@ -113,11 +113,11 @@ public final class Constants {
     // Roller: 35A protects against hard game piece jams; still ample intake torque
     // Pivot:  NEO 550 safe peak current; limits current into the mechanical hard stop
     public static final int ROLLER_CURRENT_LIMIT = 35;
-    public static final int PIVOT_CURRENT_LIMIT  = 20;
+    public static final int PIVOT_CURRENT_LIMIT  = 15;
 
     // Roller duty-cycle output
-    public static final double INTAKE_SPEED  =  0.80; // intake game piece
-    public static final double OUTTAKE_SPEED = -0.60; // eject game piece
+    public static final double INTAKE_SPEED  =  0.50; // intake game piece
+    public static final double OUTTAKE_SPEED = -0.50; // eject game piece
 
     // Pivot duty-cycle output — positive rotates toward the bumper stop (down)
     // Tune DEPLOY_SPEED first; reduce if the pivot hits the bumper too hard
@@ -131,10 +131,11 @@ public final class Constants {
   // Shooter Constants
   public static class ShooterConstants {
     // CAN IDs — update to match your robot's CAN bus
-    public static final int FEED_LEADER_MOTOR_ID   = 16;
-    public static final int FEED_FOLLOWER_MOTOR_ID = 17; // follows FEED_LEADER_MOTOR_ID, same direction
-    public static final int FLYWHEEL_MOTOR_ID      = 18;
-    public static final int AGITATOR_MOTOR_ID      = 19; // SparkFlex, NEO Vortex
+    public static final int FEED_LEADER_MOTOR_ID       = 16;
+    public static final int FEED_FOLLOWER_MOTOR_ID     = 17; // follows FEED_LEADER_MOTOR_ID, same direction
+    public static final int FLYWHEEL_MOTOR_ID          = 18;
+    public static final int AGITATOR_MOTOR_ID          = 19; // SparkFlex, NEO Vortex
+    public static final int AGITATOR_FOLLOWER_MOTOR_ID = 15; // follows AGITATOR_MOTOR_ID, inverted
 
     // Current limits (amps) — sized to match 40A PDP/PDH breakers and protect motors.
     // Flywheel: 50A allows fast spin-up while staying below breaker trip threshold.
@@ -150,20 +151,20 @@ public final class Constants {
 
     // Closed-loop ramp rates (seconds to reach full output) — prevents voltage sag on spin-up
     public static final double FLYWHEEL_RAMP_RATE = 0.25;
-    public static final double FEED_RAMP_RATE     = 0.10;
+    public static final double FEED_RAMP_RATE     = 0.25;
 
     // Flywheel PID — Neo Vortex starting values (tune on carpet)
     // kV = 1 / 6784 RPM (Neo Vortex free speed) — applied as duty-cycle per RPM
-    public static final double FLYWHEEL_KP = 0.0002, FLYWHEEL_KI = 0.0, FLYWHEEL_KD = 0.0, FLYWHEEL_KV = 0.000152;
+    public static final double FLYWHEEL_KP = 0.0000, FLYWHEEL_KI = 0.0, FLYWHEEL_KD = 0.0, FLYWHEEL_KV = 0.000152;
 
     // Feed motor PID — tune separately; feed roller has a different load than the flywheel
-    public static final double FEED_KP = 0.0002, FEED_KI = 0.0, FEED_KD = 0.0, FEED_KV = 0.000152;
+    public static final double FEED_KP = 0.0000, FEED_KI = 0.0, FEED_KD = 0.0, FEED_KV = 0.000152;
 
     // Flywheel considered at speed within this many RPM of target
     public static final double FLYWHEEL_RPM_TOLERANCE = 50.0;
 
     // Default RPMs (used as fallback; range table takes over during normal operation)
-    public static final double DEFAULT_FLYWHEEL_RPM  = 4000.0;
+    public static final double DEFAULT_FLYWHEEL_RPM  = 3500.0;
     public static final double DEFAULT_FEED_RPM      = 1500.0;
 
     // How long to keep feeding balls during an auto shoot sequence
