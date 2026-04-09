@@ -20,10 +20,6 @@ import edu.wpi.first.math.util.Units;
 
 public final class Constants {
 
-  // Set true during testing to enable live parameter adjustment from the dashboard.
-  // Always set false before competition — competition mode uses hard-coded constants only.
-  public static final boolean TUNING_MODE = true;
-
   public static final AprilTagFieldLayout APRIL_TAG_FIELD_LAYOUT = AprilTagFieldLayout.loadField(AprilTagFields.k2026RebuiltWelded);
 
   // Drivetrain Constants
@@ -105,7 +101,7 @@ public final class Constants {
   // Intake Constants
   public static class IntakeConstants {
     // CAN IDs — update to match your robot's CAN bus
-    public static final int ROLLER_MOTOR_ID          = 20; // SparkFlex, NEO Vortex
+    public static final int ROLLER_MOTOR_ID         = 20; // SparkFlex, NEO Vortex
     public static final int PIVOT_LEADER_MOTOR_ID   = 21; // SparkMax, NEO 550
     public static final int PIVOT_FOLLOWER_MOTOR_ID = 22; // SparkMax, NEO 550
 
@@ -131,41 +127,47 @@ public final class Constants {
   // Shooter Constants
   public static class ShooterConstants {
     // CAN IDs — update to match your robot's CAN bus
-    public static final int FEED_LEADER_MOTOR_ID       = 16;
-    public static final int FEED_FOLLOWER_MOTOR_ID     = 17; // follows FEED_LEADER_MOTOR_ID, same direction
-    public static final int FLYWHEEL_MOTOR_ID          = 18;
+    public static final int FLYWHEEL_MOTOR_ID          = 16;
+    public static final int FEED_MOTOR_ID              = 17;
+    public static final int BACK_ROLLER_MOTOR_ID       = 18; // independent back roller (formerly feed follower)
     public static final int AGITATOR_MOTOR_ID          = 19; // SparkFlex, NEO Vortex
     public static final int AGITATOR_FOLLOWER_MOTOR_ID = 15; // follows AGITATOR_MOTOR_ID, inverted
 
     // Current limits (amps) — sized to match 40A PDP/PDH breakers and protect motors.
     // Flywheel: 50A allows fast spin-up while staying below breaker trip threshold.
     //           Reduce to 40A if breakers trip during match play.
-    // FEED_CURRENT_LIMIT is applied to both the feed leader and its follower.
-    public static final int FLYWHEEL_CURRENT_LIMIT = 50;
-    public static final int FEED_CURRENT_LIMIT     = 30;
-    public static final int AGITATOR_CURRENT_LIMIT = 30;
+    public static final int FLYWHEEL_CURRENT_LIMIT     = 40;
+    public static final int FEED_CURRENT_LIMIT         = 30;
+    public static final int BACK_ROLLER_CURRENT_LIMIT  = 25;
+    public static final int AGITATOR_CURRENT_LIMIT     = 30;
 
     // Agitator duty-cycle speed — runs open-loop whenever the feed is active
     // Positive = toward shooter; reduce if balls jam, increase if feed starves
-    public static final double AGITATOR_SPEED = 0.6; // TUNE THIS
+    public static final double AGITATOR_SPEED = 0.3; // TUNE THIS
 
     // Closed-loop ramp rates (seconds to reach full output) — prevents voltage sag on spin-up
-    public static final double FLYWHEEL_RAMP_RATE = 0.25;
-    public static final double FEED_RAMP_RATE     = 0.25;
+    public static final double FLYWHEEL_RAMP_RATE     = 0.75;
+    public static final double FEED_RAMP_RATE         = 0.25;
+    public static final double BACK_ROLLER_RAMP_RATE  = 0.75;
 
     // Flywheel PID — Neo Vortex starting values (tune on carpet)
     // kV = 1 / 6784 RPM (Neo Vortex free speed) — applied as duty-cycle per RPM
-    public static final double FLYWHEEL_KP = 0.0000, FLYWHEEL_KI = 0.0, FLYWHEEL_KD = 0.0, FLYWHEEL_KV = 0.000152;
+    public static final double FLYWHEEL_KP = 0.0002, FLYWHEEL_KI = 0.0, FLYWHEEL_KD = 0.0, FLYWHEEL_KV = 0.000147;
 
     // Feed motor PID — tune separately; feed roller has a different load than the flywheel
-    public static final double FEED_KP = 0.0000, FEED_KI = 0.0, FEED_KD = 0.0, FEED_KV = 0.000152;
+    public static final double FEED_KP = 0.0002, FEED_KI = 0.0, FEED_KD = 0.0, FEED_KV = 0.000147;
 
-    // Flywheel considered at speed within this many RPM of target
-    public static final double FLYWHEEL_RPM_TOLERANCE = 50.0;
+    // Back roller PID — tune separately
+    public static final double BACK_ROLLER_KP = 0.0002, BACK_ROLLER_KI = 0.0, BACK_ROLLER_KD = 0.0, BACK_ROLLER_KV = 0.000147;
+
+    // At-speed tolerances (RPM)
+    public static final double FLYWHEEL_RPM_TOLERANCE     = 50.0;
+    public static final double BACK_ROLLER_RPM_TOLERANCE  = 50.0;
 
     // Default RPMs (used as fallback; range table takes over during normal operation)
-    public static final double DEFAULT_FLYWHEEL_RPM  = 3500.0;
-    public static final double DEFAULT_FEED_RPM      = 1500.0;
+    public static final double DEFAULT_FLYWHEEL_RPM     = 3000.0;
+    public static final double DEFAULT_FEED_RPM         = 1000.0;
+    public static final double DEFAULT_BACK_ROLLER_RPM  = 1500.0; // TUNE THIS
 
     // How long to keep feeding balls during an auto shoot sequence
     public static final double SHOOT_DURATION_SECONDS = 2.0; // TUNE THIS

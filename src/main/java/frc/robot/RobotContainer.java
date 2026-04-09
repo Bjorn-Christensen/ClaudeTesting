@@ -20,7 +20,6 @@ import frc.robot.Constants.VisionConstants;
 import frc.robot.subsystems.IntakeSubsystem;
 import frc.robot.subsystems.ShooterSubsystem;
 import frc.robot.subsystems.SwerveSubsystem;
-import frc.robot.util.TunableNumber;
 
 import swervelib.SwerveInputStream;
 
@@ -41,14 +40,6 @@ public class RobotContainer {
   // Subsystem requirements for deferred commands (required by Commands.defer)
   private final Set<Subsystem> swerveReq   = Set.of(swerveSubsystem);
   private final Set<Subsystem> shooterReq  = Set.of(shooterSubsystem);
-
-  // ---- Tunable parameters ----
-  private static final TunableNumber kDefaultFlywheelRpm  =
-      new TunableNumber("Tuning/Shooter/DefaultFlywheelRPM",  ShooterConstants.DEFAULT_FLYWHEEL_RPM);
-  private static final TunableNumber kDefaultFeedRpm      =
-      new TunableNumber("Tuning/Shooter/DefaultFeedRPM",      ShooterConstants.DEFAULT_FEED_RPM);
-  private static final TunableNumber kShootDuration       =
-      new TunableNumber("Tuning/Shooter/ShootDurationSecs",   ShooterConstants.SHOOT_DURATION_SECONDS);
 
   // Converts driver input into a field-relative ChassisSpeeds that is controlled by angular velocity.
   SwerveInputStream driveAngularVelocity = SwerveInputStream.of(swerveSubsystem.getSwerveDrive(),
@@ -77,9 +68,10 @@ public class RobotContainer {
     NamedCommands.registerCommand("shootBalls",
         Commands.defer(() -> shooterSubsystem.shootOnReadyCommand(
             this::flywheelRpm,
-            kDefaultFeedRpm.get(),
+            ShooterConstants.DEFAULT_BACK_ROLLER_RPM,
+            ShooterConstants.DEFAULT_FEED_RPM,
             swerveSubsystem::isFacingGoal
-        ).withTimeout(kShootDuration.get()), shooterReq));
+        ).withTimeout(ShooterConstants.SHOOT_DURATION_SECONDS), shooterReq));
 
     // Build chooser after NamedCommands are registered so that event markers have something to call
     autoChooser = new LoggedDashboardChooser<>("Auto Routine", AutoBuilder.buildAutoChooser("Test"));
@@ -100,7 +92,8 @@ public class RobotContainer {
     controllerXbox.leftTrigger(ControllerConstants.LEFT_TRIGGER_DEADZONE).whileTrue(
         Commands.defer(() -> shooterSubsystem.shootOnReadyCommand(
             this::flywheelRpm,
-            kDefaultFeedRpm.get(),
+            ShooterConstants.DEFAULT_BACK_ROLLER_RPM,
+            ShooterConstants.DEFAULT_FEED_RPM,
             () -> true
         ), shooterReq)
     );
@@ -109,7 +102,8 @@ public class RobotContainer {
     controllerXbox.rightTrigger(ControllerConstants.RIGHT_TRIGGER_DEADZONE).whileTrue(
         Commands.defer(() -> shooterSubsystem.shootOnReadyCommand(
             this::flywheelRpm,
-            kDefaultFeedRpm.get(),
+            ShooterConstants.DEFAULT_BACK_ROLLER_RPM,
+            ShooterConstants.DEFAULT_FEED_RPM,
             swerveSubsystem::isFacingGoal
         ), shooterReq)
     );
@@ -155,7 +149,7 @@ public class RobotContainer {
   private double flywheelRpm() {
     return VisionConstants.CAMERAS_ENABLED
         ? ShooterConstants.RANGE_TABLE.get(swerveSubsystem.getDistanceToHub())
-        : kDefaultFlywheelRpm.get();
+        : ShooterConstants.DEFAULT_FLYWHEEL_RPM;
   }
 
   // Set drive Controls For Teleop

@@ -15,7 +15,6 @@ import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import org.littletonrobotics.junction.Logger;
 
 import frc.robot.Constants.IntakeConstants;
-import frc.robot.util.TunableNumber;
 
 /**
  * Controls the intake roller and pivot mechanisms.
@@ -36,16 +35,6 @@ public class IntakeSubsystem extends SubsystemBase {
     // ---- Pivot ----
     private final SparkMax pivotLeader;
     private final SparkMax pivotFollower;
-
-    // ---- Tunable parameters ----
-    private static final TunableNumber kIntakeSpeed       =
-        new TunableNumber("Tuning/Intake/IntakeSpeed",       IntakeConstants.INTAKE_SPEED);
-    private static final TunableNumber kOuttakeSpeed      =
-        new TunableNumber("Tuning/Intake/OuttakeSpeed",      IntakeConstants.OUTTAKE_SPEED);
-    private static final TunableNumber kPivotDeploySpeed  =
-        new TunableNumber("Tuning/Intake/PivotDeploySpeed",  IntakeConstants.PIVOT_DEPLOY_SPEED);
-    private static final TunableNumber kPivotRetractSpeed =
-        new TunableNumber("Tuning/Intake/PivotRetractSpeed", IntakeConstants.PIVOT_RETRACT_SPEED);
 
     public IntakeSubsystem() {
 
@@ -78,14 +67,14 @@ public class IntakeSubsystem extends SubsystemBase {
 
     // ---- Roller low-level control ----
 
-    public void runIntake()     { rollerMotor.set(kIntakeSpeed.get()); }
-    public void reverseIntake() { rollerMotor.set(kOuttakeSpeed.get()); }
+    public void runIntake()     { rollerMotor.set(IntakeConstants.INTAKE_SPEED); }
+    public void reverseIntake() { rollerMotor.set(IntakeConstants.OUTTAKE_SPEED); }
     public void stopIntake()    { rollerMotor.stopMotor(); }
 
     // ---- Pivot low-level control ----
 
-    public void deployPivot()  { pivotLeader.set(kPivotDeploySpeed.get()); }
-    public void retractPivot() { pivotLeader.set(kPivotRetractSpeed.get()); }
+    public void deployPivot()  { pivotLeader.set(IntakeConstants.PIVOT_DEPLOY_SPEED); }
+    public void retractPivot() { pivotLeader.set(IntakeConstants.PIVOT_RETRACT_SPEED); }
     public void stopPivot()    { pivotLeader.stopMotor(); }
 
     // ---- Roller commands ----
