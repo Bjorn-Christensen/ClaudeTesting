@@ -16,7 +16,7 @@ import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import frc.robot.Constants.DrivetrainConstants;
 import frc.robot.Constants.ControllerConstants;
 import frc.robot.Constants.ShooterConstants;
-import frc.robot.Constants.VisionConstants;
+
 import frc.robot.subsystems.IntakeSubsystem;
 import frc.robot.subsystems.ShooterSubsystem;
 import frc.robot.subsystems.SwerveSubsystem;
@@ -67,7 +67,7 @@ public class RobotContainer {
     // Commands.defer() re-evaluates the tunable values each time the command is scheduled.
     NamedCommands.registerCommand("shootBalls",
         Commands.defer(() -> shooterSubsystem.shootOnReadyCommand(
-            this::flywheelRpm,
+            ShooterConstants.DEFAULT_FLYWHEEL_RPM,
             ShooterConstants.DEFAULT_BACK_ROLLER_RPM,
             ShooterConstants.DEFAULT_FEED_RPM,
             swerveSubsystem::isFacingGoal
@@ -91,22 +91,13 @@ public class RobotContainer {
     // Use when cameras are off or during bench/distance testing.
     controllerXbox.leftTrigger(ControllerConstants.LEFT_TRIGGER_DEADZONE).whileTrue(
         Commands.defer(() -> shooterSubsystem.shootOnReadyCommand(
-            this::flywheelRpm,
+            ShooterConstants.DEFAULT_FLYWHEEL_RPM,
             ShooterConstants.DEFAULT_BACK_ROLLER_RPM,
             ShooterConstants.DEFAULT_FEED_RPM,
             () -> true
         ), shooterReq)
     );
 
-    // Hold right trigger to shoot — range-adjusted RPM, requires facing the goal.
-    controllerXbox.rightTrigger(ControllerConstants.RIGHT_TRIGGER_DEADZONE).whileTrue(
-        Commands.defer(() -> shooterSubsystem.shootOnReadyCommand(
-            this::flywheelRpm,
-            ShooterConstants.DEFAULT_BACK_ROLLER_RPM,
-            ShooterConstants.DEFAULT_FEED_RPM,
-            swerveSubsystem::isFacingGoal
-        ), shooterReq)
-    );
 
     // ---- Operator controller (port 1) — intake ----
 
@@ -143,13 +134,6 @@ public class RobotContainer {
     }
 
     return selected;
-  }
-
-  // Returns range-table RPM when vision pose is trustworthy, tunable default otherwise.
-  private double flywheelRpm() {
-    return VisionConstants.CAMERAS_ENABLED
-        ? ShooterConstants.RANGE_TABLE.get(swerveSubsystem.getDistanceToHub())
-        : ShooterConstants.DEFAULT_FLYWHEEL_RPM;
   }
 
   // Set drive Controls For Teleop

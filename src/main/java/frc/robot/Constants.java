@@ -3,7 +3,6 @@ package frc.robot;
 import java.io.File;
 import java.util.List;
 
-import edu.wpi.first.math.interpolation.InterpolatingDoubleTreeMap;
 import edu.wpi.first.wpilibj.Filesystem;
 import edu.wpi.first.apriltag.AprilTagFieldLayout;
 import edu.wpi.first.apriltag.AprilTagFields;
@@ -129,73 +128,60 @@ public final class Constants {
     // CAN IDs — update to match your robot's CAN bus
     public static final int FLYWHEEL_MOTOR_ID          = 16;
     public static final int FEED_MOTOR_ID              = 17;
+    public static final int FEED_FOLLOWER_MOTOR_ID     = 14;
     public static final int BACK_ROLLER_MOTOR_ID       = 18; // independent back roller (formerly feed follower)
     public static final int AGITATOR_MOTOR_ID          = 19; // SparkFlex, NEO Vortex
     public static final int AGITATOR_FOLLOWER_MOTOR_ID = 15; // follows AGITATOR_MOTOR_ID, inverted
 
-    // Current limits (amps) — sized to match 40A PDP/PDH breakers and protect motors.
-    // Flywheel: 50A allows fast spin-up while staying below breaker trip threshold.
-    //           Reduce to 40A if breakers trip during match play.
-    public static final int FLYWHEEL_CURRENT_LIMIT     = 40;
+    // Current limits (amps)
+    // Back roller is the heavy/high-inertia roller and gets the higher limit for spin-up torque.
+    // Flywheel is a lightweight front roller — lower limit is sufficient.
+    public static final int FLYWHEEL_CURRENT_LIMIT     = 25;
     public static final int FEED_CURRENT_LIMIT         = 30;
-    public static final int BACK_ROLLER_CURRENT_LIMIT  = 25;
+    public static final int BACK_ROLLER_CURRENT_LIMIT  = 40;
     public static final int AGITATOR_CURRENT_LIMIT     = 30;
 
     // Agitator duty-cycle speed — runs open-loop whenever the feed is active
     // Positive = toward shooter; reduce if balls jam, increase if feed starves
-    public static final double AGITATOR_SPEED = 0.3; // TUNE THIS
+    public static final double AGITATOR_SPEED = 0.3;
+
+    // Nominal battery voltage used for voltage compensation on closed-loop motors.
+    // Set to the minimum expected voltage under full shooter load (~11 V), not the resting voltage.
+    // The Spark can only scale output downward — setting this above actual available voltage clips at 100%.
+    public static final double VOLTAGE_COMPENSATION = 11.0;
 
     // Closed-loop ramp rates (seconds to reach full output) — prevents voltage sag on spin-up
-    public static final double FLYWHEEL_RAMP_RATE     = 0.75;
+    // Back roller is heavier (more inertia) so it ramps slower to avoid current spikes.
+    // Flywheel is light and can ramp quickly.
+    public static final double FLYWHEEL_RAMP_RATE     = 0.15;
     public static final double FEED_RAMP_RATE         = 0.25;
-    public static final double BACK_ROLLER_RAMP_RATE  = 0.75;
+    public static final double BACK_ROLLER_RAMP_RATE  = 0.50;
 
-    // Flywheel PID — Neo Vortex starting values (tune on carpet)
+    // Flywheel PID
     // kV = 1 / 6784 RPM (Neo Vortex free speed) — applied as duty-cycle per RPM
+    // kP corrects speed droop when a ball passes through; increase if recovery between shots is slow,
+    // decrease if the motor oscillates (hunts) around the setpoint.
     public static final double FLYWHEEL_KP = 0.0002, FLYWHEEL_KI = 0.0, FLYWHEEL_KD = 0.0, FLYWHEEL_KV = 0.000147;
 
-    // Feed motor PID — tune separately; feed roller has a different load than the flywheel
+    // Feed motor PID
     public static final double FEED_KP = 0.0002, FEED_KI = 0.0, FEED_KD = 0.0, FEED_KV = 0.000147;
 
-    // Back roller PID — tune separately
+    // Back roller PID — same kP reasoning as flywheel
     public static final double BACK_ROLLER_KP = 0.0002, BACK_ROLLER_KI = 0.0, BACK_ROLLER_KD = 0.0, BACK_ROLLER_KV = 0.000147;
 
     // At-speed tolerances (RPM)
     public static final double FLYWHEEL_RPM_TOLERANCE     = 50.0;
+    public static final double FEED_RPM_TOLERANCE         = 50.0;
     public static final double BACK_ROLLER_RPM_TOLERANCE  = 50.0;
 
     // Default RPMs (used as fallback; range table takes over during normal operation)
-    public static final double DEFAULT_FLYWHEEL_RPM     = 3000.0;
-    public static final double DEFAULT_FEED_RPM         = 1000.0;
-    public static final double DEFAULT_BACK_ROLLER_RPM  = 1500.0; // TUNE THIS
+    public static final double DEFAULT_FLYWHEEL_RPM     = 2500.0;
+    public static final double DEFAULT_FEED_RPM         = 1500.0;
+    public static final double DEFAULT_BACK_ROLLER_RPM  = 2500.0;
 
     // How long to keep feeding balls during an auto shoot sequence
-    public static final double SHOOT_DURATION_SECONDS = 2.0; // TUNE THIS
+    public static final double SHOOT_DURATION_SECONDS = 2.0;
 
-    // Distance (feet from hub center) → Flywheel RPM
-    // Keys are written in feet for easy measurement with a tape measure.
-    // Units.feetToMeters() converts them to meters for the robot's internal distance calculations.
-    // All RPM values are PLACEHOLDERS — measure actual shots on carpet and replace each entry.
-    // Tune the 7 ft entry first (nearest to HUB_STANDOFF_DISTANCE), then work outward.
-    public static final InterpolatingDoubleTreeMap RANGE_TABLE = new InterpolatingDoubleTreeMap();
-    static {
-      RANGE_TABLE.put(Units.feetToMeters(5.0),  2200.0);
-      RANGE_TABLE.put(Units.feetToMeters(5.5),  2350.0);
-      RANGE_TABLE.put(Units.feetToMeters(6.0),  2500.0);
-      RANGE_TABLE.put(Units.feetToMeters(6.5),  2700.0);
-      RANGE_TABLE.put(Units.feetToMeters(7.0),  2900.0);  // near HUB_STANDOFF_DISTANCE — tune this first
-      RANGE_TABLE.put(Units.feetToMeters(7.5),  3100.0);
-      RANGE_TABLE.put(Units.feetToMeters(8.0),  3300.0);
-      RANGE_TABLE.put(Units.feetToMeters(8.5),  3550.0);
-      RANGE_TABLE.put(Units.feetToMeters(9.0),  3750.0);
-      RANGE_TABLE.put(Units.feetToMeters(9.5),  3900.0);
-      RANGE_TABLE.put(Units.feetToMeters(10.0), 4050.0);
-      RANGE_TABLE.put(Units.feetToMeters(10.5), 4200.0);
-      RANGE_TABLE.put(Units.feetToMeters(11.0), 4350.0);
-      RANGE_TABLE.put(Units.feetToMeters(11.5), 4600.0);
-      RANGE_TABLE.put(Units.feetToMeters(12.0), 4800.0);
-      RANGE_TABLE.put(Units.feetToMeters(13.0), 5000.0);
-    }
   }
 
 }
