@@ -14,6 +14,7 @@ import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
 
 import frc.robot.Constants.DrivetrainConstants;
+import frc.robot.util.HubShiftUtil;
 
 public class Robot extends LoggedRobot {
   
@@ -36,12 +37,15 @@ public class Robot extends LoggedRobot {
     // AdvantageKit setup
     Logger.addDataReceiver(new NT4Publisher()); // live stream to AdvantageScope
     Logger.start();
+
+    HubShiftUtil.initShuffleboard();
   }
 
   @Override
   public void robotPeriodic() {
     // Required to run command based code
     CommandScheduler.getInstance().run();
+    HubShiftUtil.updateShuffleboard();
   }
 
   @Override
@@ -88,6 +92,7 @@ public class Robot extends LoggedRobot {
 
     // Set default commands once the match begins
     robotContainer.setSwerveDefaultCommand();
+    HubShiftUtil.initialize();
   }
 
   @Override
