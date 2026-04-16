@@ -67,15 +67,15 @@ public class HubShiftUtil {
     ourHubActiveEntry =
         tab.add("Our Hub Active", false)
             .withWidget(BuiltInWidgets.kBooleanBox)
-            .withPosition(0, 0)
-            .withSize(3, 2)
+            .withPosition(4, 2)
+            .withSize(2, 2)
             .getEntry();
 
     blueActiveEntry =
         tab.add("Blue", false)
             .withWidget(BuiltInWidgets.kBooleanBox)
             .withProperties(Map.of("Color when true", "blue", "Color when false", "#222222"))
-            .withPosition(0, 2)
+            .withPosition(2, 0)
             .withSize(2, 2)
             .getEntry();
 
@@ -83,21 +83,21 @@ public class HubShiftUtil {
         tab.add("Red", false)
             .withWidget(BuiltInWidgets.kBooleanBox)
             .withProperties(Map.of("Color when true", "red", "Color when false", "#222222"))
-            .withPosition(2, 2)
+            .withPosition(6, 0)
             .withSize(2, 2)
             .getEntry();
 
     currentShiftEntry =
         tab.add("Current Shift", "DISABLED")
             .withWidget(BuiltInWidgets.kTextView)
-            .withPosition(4, 2)
+            .withPosition(4, 1)
             .withSize(2, 1)
             .getEntry();
 
     shiftRemainingEntry =
         tab.add("Shift Remaining (s)", "0.00")
             .withWidget(BuiltInWidgets.kTextView)
-            .withPosition(4, 3)
+            .withPosition(4, 0)
             .withSize(2, 1)
             .getEntry();
   }

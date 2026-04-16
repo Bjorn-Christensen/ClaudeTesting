@@ -108,6 +108,7 @@ public final class Constants {
     // Roller: 35A protects against hard game piece jams; still ample intake torque
     // Pivot:  NEO 550 safe peak current; limits current into the mechanical hard stop
     public static final int ROLLER_CURRENT_LIMIT = 35;
+    public static final double ROLLER_JAM_CURRENT = 25.0; // amps — above this for >100ms = jam
     public static final int PIVOT_CURRENT_LIMIT  = 15;
 
     // Roller duty-cycle output
@@ -181,6 +182,13 @@ public final class Constants {
 
     // How long to keep feeding balls during an auto shoot sequence
     public static final double SHOOT_DURATION_SECONDS = 2.0;
+
+    // If motors haven't reached speed after this many seconds, fire anyway (battery sag fallback)
+    public static final double AGITATOR_SPINUP_TIMEOUT = 3.0;
+
+    // Agitator jam detection and auto-unjam
+    public static final double AGITATOR_JAM_CURRENT   = 20.0; // amps — above this = jammed
+    public static final double AGITATOR_UNJAM_DURATION = 0.3; // seconds to backroll
 
   }
 

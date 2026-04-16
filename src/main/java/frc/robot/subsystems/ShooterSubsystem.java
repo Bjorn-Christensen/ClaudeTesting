@@ -11,8 +11,8 @@ import com.revrobotics.spark.config.SparkBaseConfig.IdleMode;
 import com.revrobotics.spark.config.SparkFlexConfig;
 
 import java.util.function.BooleanSupplier;
-import java.util.function.DoubleSupplier;
 
+import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.FunctionalCommand;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
@@ -60,6 +60,10 @@ public class ShooterSubsystem extends SubsystemBase {
             .d(ShooterConstants.FLYWHEEL_KD);
         flywheelConfig.closedLoop.feedForward.kV(ShooterConstants.FLYWHEEL_KV);
         flywheelConfig.closedLoopRampRate(ShooterConstants.FLYWHEEL_RAMP_RATE);
+        flywheelConfig.signals
+            .primaryEncoderPositionPeriodMs(500)  // position unused; keep velocity fast for PID
+            .appliedOutputPeriodMs(20)
+            .motorTemperaturePeriodMs(500);
         flywheelMotor.configure(flywheelConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
 
         SparkFlexConfig backRollerConfig = new SparkFlexConfig();
@@ -74,6 +78,10 @@ public class ShooterSubsystem extends SubsystemBase {
             .d(ShooterConstants.BACK_ROLLER_KD);
         backRollerConfig.closedLoop.feedForward.kV(ShooterConstants.BACK_ROLLER_KV);
         backRollerConfig.closedLoopRampRate(ShooterConstants.BACK_ROLLER_RAMP_RATE);
+        backRollerConfig.signals
+            .primaryEncoderPositionPeriodMs(500)
+            .appliedOutputPeriodMs(20)
+            .motorTemperaturePeriodMs(500);
         backRollerMotor.configure(backRollerConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
 
         SparkFlexConfig feedConfig = new SparkFlexConfig();
@@ -88,24 +96,43 @@ public class ShooterSubsystem extends SubsystemBase {
             .d(ShooterConstants.FEED_KD);
         feedConfig.closedLoop.feedForward.kV(ShooterConstants.FEED_KV);
         feedConfig.closedLoopRampRate(ShooterConstants.FEED_RAMP_RATE);
+        feedConfig.signals
+            .primaryEncoderPositionPeriodMs(500)
+            .appliedOutputPeriodMs(20)
+            .motorTemperaturePeriodMs(500);
         feedMotor.configure(feedConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
 
         SparkFlexConfig feedFollowerConfig = new SparkFlexConfig();
         feedFollowerConfig.follow(ShooterConstants.FEED_MOTOR_ID, true);
         feedFollowerConfig.idleMode(IdleMode.kCoast);
         feedFollowerConfig.smartCurrentLimit(ShooterConstants.FEED_CURRENT_LIMIT);
+        feedFollowerConfig.signals
+            .primaryEncoderPositionPeriodMs(500)
+            .primaryEncoderVelocityPeriodMs(500)
+            .appliedOutputPeriodMs(500)
+            .motorTemperaturePeriodMs(500);
         feedFollowerMotor.configure(feedFollowerConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
 
         SparkFlexConfig agitatorConfig = new SparkFlexConfig();
         agitatorConfig.inverted(false);
         agitatorConfig.idleMode(IdleMode.kCoast);
         agitatorConfig.smartCurrentLimit(ShooterConstants.AGITATOR_CURRENT_LIMIT);
+        agitatorConfig.signals
+            .primaryEncoderPositionPeriodMs(500)
+            .primaryEncoderVelocityPeriodMs(500)
+            .appliedOutputPeriodMs(20)
+            .motorTemperaturePeriodMs(500);
         agitatorMotor.configure(agitatorConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
 
         SparkFlexConfig agitatorFollowerConfig = new SparkFlexConfig();
         agitatorFollowerConfig.follow(ShooterConstants.AGITATOR_MOTOR_ID, true);
         agitatorFollowerConfig.idleMode(IdleMode.kCoast);
         agitatorFollowerConfig.smartCurrentLimit(ShooterConstants.AGITATOR_CURRENT_LIMIT);
+        agitatorFollowerConfig.signals
+            .primaryEncoderPositionPeriodMs(500)
+            .primaryEncoderVelocityPeriodMs(500)
+            .appliedOutputPeriodMs(500)
+            .motorTemperaturePeriodMs(500);
         agitatorFollowerMotor.configure(agitatorFollowerConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
 
         flywheelController    = flywheelMotor.getClosedLoopController();
@@ -179,20 +206,43 @@ public class ShooterSubsystem extends SubsystemBase {
      * before they are actually shot.
      */
     public Command shootOnReadyCommand(double flywheelRpm, double backRollerRpm, double feedRpm, BooleanSupplier robotReady) {
+        final Timer spinupTimer = new Timer();
+        final Timer unjamTimer = new Timer();
+        final boolean[] isUnjamming = {false};
         return new FunctionalCommand(
             // initialize — called once when the command starts
             () -> {
                 setFlywheelRpm(flywheelRpm);
                 setBackRollerRpm(backRollerRpm);
                 setFeedRpm(feedRpm);
+                spinupTimer.restart();
+                isUnjamming[0] = false;
             },
-            // execute — called every loop; only manages the agitator
+            // execute — fires when at-speed, or after timeout; auto-unjams if agitator jams
             () -> {
-                if (!agitatorActive
-                        && flywheelAtSpeed() && backRollerAtSpeed() && feedAtSpeed()
-                        && robotReady.getAsBoolean()) {
-                    agitatorMotor.set(ShooterConstants.AGITATOR_SPEED);
-                    agitatorActive = true;
+                boolean atSpeed = flywheelAtSpeed() && backRollerAtSpeed() && feedAtSpeed();
+                boolean timedOut = spinupTimer.hasElapsed(ShooterConstants.AGITATOR_SPINUP_TIMEOUT);
+
+                if (isUnjamming[0]) {
+                    // Backroll until unjam duration elapses, then resume
+                    agitatorMotor.set(-ShooterConstants.AGITATOR_SPEED);
+                    agitatorActive = false;
+                    if (unjamTimer.hasElapsed(ShooterConstants.AGITATOR_UNJAM_DURATION)) {
+                        isUnjamming[0] = false;
+                    }
+                } else if ((atSpeed || timedOut) && robotReady.getAsBoolean()) {
+                    // Check for jam before running forward
+                    if (agitatorActive
+                            && agitatorMotor.getOutputCurrent() > ShooterConstants.AGITATOR_JAM_CURRENT) {
+                        isUnjamming[0] = true;
+                        unjamTimer.restart();
+                    } else {
+                        agitatorMotor.set(ShooterConstants.AGITATOR_SPEED);
+                        agitatorActive = true;
+                    }
+                } else {
+                    agitatorMotor.stopMotor();
+                    agitatorActive = false;
                 }
             },
             // end — called once when the button is released (or command is interrupted)

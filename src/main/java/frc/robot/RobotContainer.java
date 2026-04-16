@@ -13,11 +13,13 @@ import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.Subsystem;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
+import edu.wpi.first.wpilibj2.command.button.Trigger;
 import frc.robot.Constants.DrivetrainConstants;
 import frc.robot.Constants.ControllerConstants;
 import frc.robot.Constants.ShooterConstants;
 
-import frc.robot.subsystems.IntakeSubsystem;
+import frc.robot.subsystems.IntakePivotSubsystem;
+import frc.robot.subsystems.IntakeRollerSubsystem;
 import frc.robot.subsystems.ShooterSubsystem;
 import frc.robot.subsystems.SwerveSubsystem;
 
@@ -28,7 +30,8 @@ public class RobotContainer {
   // Subsystems
   private final SwerveSubsystem swerveSubsystem = new SwerveSubsystem(DrivetrainConstants.swerveJsonDirectory);
   private final ShooterSubsystem shooterSubsystem = new ShooterSubsystem();
-  private final IntakeSubsystem intakeSubsystem = new IntakeSubsystem();
+  private final IntakeRollerSubsystem intakeRollerSubsystem = new IntakeRollerSubsystem();
+  private final IntakePivotSubsystem intakePivotSubsystem = new IntakePivotSubsystem();
 
   // Joysticks
   final CommandXboxController controllerXbox    = new CommandXboxController(0); // driver
@@ -58,10 +61,10 @@ public class RobotContainer {
     // Register named commands for PathPlanner
     NamedCommands.registerCommand("lineUpShot",
         Commands.defer(() -> swerveSubsystem.lineUpForShooter(), swerveReq));
-    NamedCommands.registerCommand("deployIntake",  intakeSubsystem.deployPivotCommand());
-    NamedCommands.registerCommand("retractIntake", intakeSubsystem.retractPivotCommand());
-    NamedCommands.registerCommand("runIntake",     intakeSubsystem.intakeCommand());
-    NamedCommands.registerCommand("stopIntake",    intakeSubsystem.stopCommand());
+    NamedCommands.registerCommand("deployIntake",  intakePivotSubsystem.deployPivotCommand());
+    NamedCommands.registerCommand("retractIntake", intakePivotSubsystem.retractPivotCommand());
+    NamedCommands.registerCommand("runIntake",     intakeRollerSubsystem.intakeCommand());
+    NamedCommands.registerCommand("stopIntake",    intakeRollerSubsystem.stopCommand());
 
     // Shoot for a fixed duration using the range table and isFacingGoal as the ready gate.
     // Commands.defer() re-evaluates the tunable values each time the command is scheduled.
@@ -103,17 +106,22 @@ public class RobotContainer {
 
     // Hold left trigger to run intake rollers inward
     operatorXbox.leftTrigger(ControllerConstants.LEFT_TRIGGER_DEADZONE)
-        .whileTrue(intakeSubsystem.intakeCommand());
+        .whileTrue(intakeRollerSubsystem.intakeCommand());
 
     // Hold right trigger to eject / reverse intake rollers
     operatorXbox.rightTrigger(ControllerConstants.RIGHT_TRIGGER_DEADZONE)
-        .whileTrue(intakeSubsystem.ejectCommand());
+        .whileTrue(intakeRollerSubsystem.ejectCommand());
 
     // Hold left bumper to deploy pivot; releasing coasts to bumper stop
-    operatorXbox.leftBumper().whileTrue(intakeSubsystem.deployPivotCommand());
+    operatorXbox.leftBumper().whileTrue(intakePivotSubsystem.deployPivotCommand());
 
     // Hold right bumper to retract pivot; release to stop
-    operatorXbox.rightBumper().whileTrue(intakeSubsystem.retractPivotCommand());
+    operatorXbox.rightBumper().whileTrue(intakePivotSubsystem.retractPivotCommand());
+
+    // Auto-unjam: if roller current spikes for 100ms, briefly retract then redeploy the pivot
+    new Trigger(intakeRollerSubsystem::isJammed)
+        .debounce(0.1)
+        .onTrue(intakePivotSubsystem.unjamCommand());
 
   }
 
