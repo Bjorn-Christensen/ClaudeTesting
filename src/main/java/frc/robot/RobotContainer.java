@@ -90,6 +90,19 @@ public class RobotContainer {
     // Reset odometry to (0,0) — useful during testing/practice, never press mid-match
     controllerXbox.povLeft().onTrue(Commands.runOnce(() -> swerveSubsystem.resetOdometry(new Pose2d()), swerveSubsystem));
 
+    // Hold right trigger for precision mode — reduces translation and rotation to SLOW_MODE_SCALE
+    // for fine shot lineup adjustments. Releases back to normal drive automatically.
+    controllerXbox.rightTrigger(ControllerConstants.RIGHT_TRIGGER_DEADZONE).whileTrue(
+        swerveSubsystem.driveFieldOriented(
+            SwerveInputStream.of(swerveSubsystem.getSwerveDrive(),
+                                 () -> controllerXbox.getLeftY() * -1,
+                                 () -> controllerXbox.getLeftX() * -1)
+                            .withControllerRotationAxis(() -> controllerXbox.getRightX() * -1)
+                            .deadband(ControllerConstants.DEADZONE)
+                            .scaleTranslation(ControllerConstants.SLOW_MODE_SCALE)
+                            .scaleRotation(ControllerConstants.SLOW_MODE_SCALE)
+                            .allianceRelativeControl(true)));
+
     // Hold left trigger to test-shoot — range-adjusted RPM, no facing-goal check.
     // Use when cameras are off or during bench/distance testing.
     controllerXbox.leftTrigger(ControllerConstants.LEFT_TRIGGER_DEADZONE).whileTrue(

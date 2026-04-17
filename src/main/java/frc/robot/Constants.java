@@ -32,6 +32,7 @@ public final class Constants {
   public static class ControllerConstants {
     public static final double DEADZONE = 0.2;
     public static final double LEFT_TRIGGER_DEADZONE = 0.1, RIGHT_TRIGGER_DEADZONE = 0.1;
+    public static final double SLOW_MODE_SCALE = 0.35; // fraction of max speed in precision mode
   }
 
   // April Tags
